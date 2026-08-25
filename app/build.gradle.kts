@@ -20,9 +20,9 @@ android {
     // 签名配置：从环境变量读 keystore（CI 通过 GitHub Secrets 注入）
     // 没配置则兜底用 debug 签名，保证 CI 永不因签名缺失失败
     val keystoreFile = System.getenv("SIGNING_KEYSTORE_FILE")
-    val keystorePass = System.getenv("SIGNING_KEYSTORE_PASSWORD")
-    val keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-    val keyPass = System.getenv("SIGNING_KEY_PASSWORD")
+    val keystorePass = System.getenv("SIGNING_PASSWORD")
+    val keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "openclash"
+    val keyPass = System.getenv("SIGNING_PASSWORD")
     val hasKeystore = !keystoreFile.isNullOrBlank() && File(keystoreFile).isFile
 
     signingConfigs {

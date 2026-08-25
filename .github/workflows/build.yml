@@ -29,20 +29,24 @@ jobs:
 
       # ============== 正式版签名（仅当仓库 Secrets 配置了 SIGNING_KEYSTORE_BASE64 时生效） ==============
       # 没配置时 build.gradle.kts 自动兜底用 debug 签名，build 不会失败但 APK 不能升级安装。
+      # 只要求 3 个 Secrets：SIGNING_KEYSTORE_BASE64 / SIGNING_PASSWORD / SIGNING_KEY_ALIAS（可选）
       - name: Decode signing keystore
         if: ${{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
         env:
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # 注意：GitHub Actions YAML 解析器对 secrets 的直接引用很敏感，用双引号包裹是官方推荐的避免解析错误的写法。
+          SIGNING_KEYSTORE_BASE64: "${{ secrets.SIGNING_KEYSTORE_BASE64 }}"
+          SIGNING_PASSWORD: "${{ secrets.SIGNING_PASSWORD }}"
+          SIGNING_KEY_ALIAS: "${{ secrets.SIGNING_KEY_ALIAS }}"
         run: |
           KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
           echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
           echo "SIGNING_KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "SIGNING_KEYSTORE_PASSWORD=$SIGNING_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "SIGNING_KEY_ALIAS=$SIGNING_KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "SIGNING_KEY_PASSWORD=$SIGNING_KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "SIGNING_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+          if [ -n "$SIGNING_KEY_ALIAS" ]; then
+            echo "SIGNING_KEY_ALIAS=$SIGNING_KEY_ALIAS" >> "$GITHUB_ENV"
+          else
+            echo "SIGNING_KEY_ALIAS=openclash" >> "$GITHUB_ENV"
+          fi
           echo "Keystore decoded to $KEYSTORE_PATH (size: $(wc -c < "$KEYSTORE_PATH") bytes)"
 
       # 同时跑 debug（保险）和 release（主产物）
@@ -66,7 +70,7 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
-      # 同时上传 mapping.txt：R8 混淆后的堆栈对照表，将来用户线上崩溃报告用得到
+      # R8 mapping
       - name: Upload R8 mapping
         uses: actions/upload-artifact@v4
         with:
