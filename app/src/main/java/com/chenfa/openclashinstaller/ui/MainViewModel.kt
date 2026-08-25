@@ -84,8 +84,15 @@ class MainViewModel(
             _events.trySend(UiEvent.Toast("当前正忙，无法启动新操作"))
             return
         }
+        _uiState.update {
+            it.copy(
+                busy = true,
+                activeOp = op,
+                operationOpen = true,
+                operationTitle = opTitle(op),
+            )
+        }
         currentJob = viewModelScope.launch {
-            _uiState.update { it.copy(busy = true, activeOp = op) }
             try {
                 block()
             } catch (c: CancellationException) {
@@ -100,9 +107,30 @@ class MainViewModel(
         }
     }
 
+    private fun opTitle(op: OpId): String = when (op) {
+        OpId.DL_KERNEL -> "下载内核"
+        OpId.DL_OPENCLASH -> "下载 OpenClash ipk"
+        OpId.TESTCONN -> "连接测试"
+        OpId.INSTALL -> "开始安装"
+        OpId.FAN -> "安装风扇控制"
+    }
+
+    /** 关闭操作弹窗（busy 时拒绝）。 */
+    fun closeOperation() {
+        if (_uiState.value.busy) {
+            _events.trySend(UiEvent.Toast("操作进行中，请先强制结束再关闭"))
+            return
+        }
+        _uiState.update { it.copy(operationOpen = false) }
+    }
+
     fun downloadKernel() = launchOp(OpId.DL_KERNEL) {
         appendLog("--- 开始下载内核 ---", LogKind.NORMAL)
-        val worker = WorkerDownload(downloader, ::appendLog, ::appendProgressLog)
+        val worker = WorkerDownload(
+            downloader = downloader,
+            onLog = { appendLog(it) },
+            onProgress = { appendProgressLog(it) },
+        )
         worker.execute(
             _uiState.value.kernelUrl,
             appConfig.localKernel.absolutePath,
@@ -112,7 +140,11 @@ class MainViewModel(
 
     fun downloadOpenclash() = launchOp(OpId.DL_OPENCLASH) {
         appendLog("--- 开始下载 OpenClash ipk ---", LogKind.NORMAL)
-        val worker = WorkerDownload(downloader, ::appendLog, ::appendProgressLog)
+        val worker = WorkerDownload(
+            downloader = downloader,
+            onLog = { appendLog(it) },
+            onProgress = { appendProgressLog(it) },
+        )
         worker.execute(
             _uiState.value.openclashUrl,
             appConfig.localIpk.absolutePath,
@@ -126,7 +158,7 @@ class MainViewModel(
             appendLog("✗ 请先在设置中填写 用户名 / IP / 密码 / 端口", LogKind.ERROR)
             return@launchOp
         }
-        val worker = WorkerTestConn(ssh, ::appendLog)
+        val worker = WorkerTestConn(ssh = ssh, onLog = { appendLog(it) })
         worker.execute(
             s.fields.ip,
             s.fields.user,

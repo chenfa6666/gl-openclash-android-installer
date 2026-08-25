@@ -1,8 +1,6 @@
 package com.chenfa.openclashinstaller.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,22 +38,16 @@ import com.chenfa.openclashinstaller.ui.components.CollapsibleCard
 import com.chenfa.openclashinstaller.ui.components.ConfirmAbortDialog
 import com.chenfa.openclashinstaller.ui.components.DownloadButtonsRow
 import com.chenfa.openclashinstaller.ui.components.EnvCheckRow
+import com.chenfa.openclashinstaller.ui.components.OperationDialog
 import com.chenfa.openclashinstaller.ui.components.PrimaryButton
 import com.chenfa.openclashinstaller.ui.components.PrimaryButtonVariant
-import com.chenfa.openclashinstaller.ui.components.ProgressLog
 import com.chenfa.openclashinstaller.ui.components.SettingsDialog
-import com.chenfa.openclashinstaller.ui.theme.LogBg
 
 /**
- * 主屏幕 - 上下布局 2:1。
+ * 主屏幕 - 纯操作面板（无日志区）。
  *
- * 上 2/3：操作面板（可滚动）
- *   - 环境检查（折叠 Card，默认展开）
- *   - 下载（折叠 Card，下载内核 / 下载 openclash 按钮）
- *   - 当前连接摘要 + 编辑按钮
- *   - 连接测试 / 开始安装 / 强制结束 / 安装风扇控制 按钮
- *
- * 下 1/3：运行日志（LazyColumn，进度行原地刷新，自动滚到底部）
+ * 上：环境检查 + 下载按钮 + 当前连接摘要 + 操作按钮列表（连接测试 / 开始安装 / 安装风扇控制）
+ * 点击操作按钮 → 弹出 OperationDialog 显示日志 + 强制结束按钮
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,109 +90,90 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(8.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            // 上：操作面板
-            Column(
-                modifier = Modifier
-                    .weight(2f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            // 环境检查
+            CollapsibleCard(title = "环境检查", defaultExpanded = true) {
+                state.envStatus.forEach { EnvCheckRow(it) }
+            }
+
+            // 下载
+            CollapsibleCard(title = "下载", defaultExpanded = true) {
+                DownloadButtonsRow(
+                    onKernel = vm::downloadKernel,
+                    onOpenclash = vm::downloadOpenclash,
+                    enabled = !state.busy,
+                )
+            }
+
+            // 当前连接摘要 + 编辑按钮
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
             ) {
-                // 环境检查
-                CollapsibleCard(title = "环境检查", defaultExpanded = true) {
-                    state.envStatus.forEach { EnvCheckRow(it) }
-                }
-
-                // 下载
-                CollapsibleCard(title = "下载", defaultExpanded = true) {
-                    DownloadButtonsRow(
-                        onKernel = vm::downloadKernel,
-                        onOpenclash = vm::downloadOpenclash,
-                        enabled = !state.busy,
-                    )
-                }
-
-                // 当前连接摘要 + 编辑按钮
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("当前连接", style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                "${state.fields.user}@${state.fields.ip}:${state.fields.port}",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
-                        IconButton(onClick = { vm.openSettings() }) {
-                            Icon(Icons.Default.Settings, contentDescription = "编辑连接")
-                        }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("当前连接", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "${state.fields.user}@${state.fields.ip}:${state.fields.port}",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                    IconButton(onClick = { vm.openSettings() }) {
+                        Icon(Icons.Default.Settings, contentDescription = "编辑连接")
                     }
                 }
-
-                // 操作按钮
-                PrimaryButton(
-                    text = "连接测试",
-                    onClick = vm::testConn,
-                    enabled = !state.busy,
-                )
-                PrimaryButton(
-                    text = "开始安装",
-                    onClick = {
-                        // 阶段 D：vm.install()
-                        snackbarHost.showSnackbar("阶段 D 接入：开始安装")
-                    },
-                    enabled = !state.busy,
-                )
-                PrimaryButton(
-                    text = "强制结束安装",
-                    onClick = { vm.openConfirmAbort() },
-                    enabled = state.busy,
-                    variant = PrimaryButtonVariant.ERROR,
-                )
-                PrimaryButton(
-                    text = "安装风扇控制",
-                    onClick = {
-                        // 阶段 E：vm.installFan()
-                        snackbarHost.showSnackbar("阶段 E 接入：安装风扇控制")
-                    },
-                    enabled = !state.busy,
-                    variant = PrimaryButtonVariant.TONAL_OUTLINE,
-                )
             }
 
-            // 下：运行日志（LazyColumn，进度行原地刷新）
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(LogBg),
-            ) {
-                if (state.logEntries.isEmpty()) {
-                    Text(
-                        "（暂无日志）",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(8.dp),
-                    )
-                } else {
-                    ProgressLog(entries = state.logEntries)
-                }
-            }
+            // 操作按钮列表
+            PrimaryButton(
+                text = "连接测试",
+                onClick = vm::testConn,
+                enabled = !state.busy,
+            )
+            PrimaryButton(
+                text = "开始安装",
+                onClick = {
+                    // 阶段 D：vm.install()
+                    snackbarHost.showSnackbar("阶段 D 接入：开始安装")
+                },
+                enabled = !state.busy,
+            )
+            PrimaryButton(
+                text = "安装风扇控制",
+                onClick = {
+                    // 阶段 E：vm.installFan()
+                    snackbarHost.showSnackbar("阶段 E 接入：安装风扇控制")
+                },
+                enabled = !state.busy,
+                variant = PrimaryButtonVariant.TONAL_OUTLINE,
+            )
         }
     }
 
-    // 对话框
+    // 操作弹窗：日志 + 强制结束
+    if (state.operationOpen) {
+        OperationDialog(
+            title = state.operationTitle,
+            entries = state.logEntries,
+            busy = state.busy,
+            onClose = vm::closeOperation,
+            onAbort = {
+                vm.abort()
+            },
+        )
+    }
+
+    // 设置对话框
     if (state.settingsOpen) {
         SettingsDialog(
             initialKernelUrl = state.kernelUrl,

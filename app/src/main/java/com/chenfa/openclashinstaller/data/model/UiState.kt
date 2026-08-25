@@ -21,4 +21,6 @@ data class UiState(
     val settingsOpen: Boolean = false,
     val aboutOpen: Boolean = false,
     val confirmAbortOpen: Boolean = false,
+    val operationOpen: Boolean = false,
+    val operationTitle: String = "",
 )

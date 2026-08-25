@@ -3,6 +3,7 @@ package com.chenfa.openclashinstaller.domain
 import com.chenfa.openclashinstaller.core.ext.formatBytes
 import com.chenfa.openclashinstaller.core.ext.formatSpeed
 import com.chenfa.openclashinstaller.data.repo.Downloader
+import kotlinx.coroutines.flow.collect
 
 /**
  * 下载用例：选 URL → 调 Downloader → 回写日志（含进度单行原地刷新）。
