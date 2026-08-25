@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * 「下载内核」「下载 openclash」并排按钮（都填充主色，视觉对称）。
+ * 「内核」「openclash」并排按钮（都填充主色，视觉对称）。
  */
 @Composable
 fun DownloadButtonsRow(
@@ -29,13 +29,13 @@ fun DownloadButtonsRow(
             onClick = onKernel,
             enabled = enabled,
             modifier = Modifier.weight(1f).height(48.dp),
-        ) { Text("下载内核", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
+        ) { Text("内核", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.width(8.dp))
         Button(
             onClick = onOpenclash,
             enabled = enabled,
             modifier = Modifier.weight(1f).height(48.dp),
-        ) { Text("下载 OpenClash", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
+        ) { Text("OpenClash", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
     }
 }
 
