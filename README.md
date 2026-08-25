@@ -1,1 +1,4 @@
 # 安装Openclash for android
+本项目是在Android设备中通过ssh和scp给gl设备安装open clash
+内置在中文界面解锁隐藏功能
+为gl设备安装第三方风扇控制插件
