@@ -58,7 +58,7 @@ object WorkerUnlockHidden {
             }
             // 校验：如果替换成功，menu.d 下 "lang_hide" 后紧跟 "zh-cn" 的情况应该只剩很少
             // 这里只要 grep 能搜到 "zh-tw" 在 lang_hide 之后，就认为生效
-            val verify = """grep -n -A1 '"lang_hide"' /usr/share/oui/menu.d/*.json 2>/dev/null | head -n 80 || echo "NO_FILES_OR_NO_MATCH""""
+            val verify = """grep -n -A1 '"lang_hide"' /usr/share/oui/menu.d/*.json 2>/dev/null | head -n 80 || echo 'NO_FILES_OR_NO_MATCH'"""
             val (c2, out2) = ssh.execCommand(verify, timeoutMs = 20_000L).getOrElse { (-1 to it.message.orEmpty()) }
             runCatching { ssh.disconnect() }
             if (c2 != 0) {
