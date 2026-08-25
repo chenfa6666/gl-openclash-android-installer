@@ -45,6 +45,7 @@ object WorkerInstall {
         try {
             val (kernelUrl, openclashUrl, _) = urls
             val f = fields
+            val port = f.port.toIntOrNull() ?: 22
             ensureActiveOrCancel()
 
             // 先确保 2 文件在本地（不在→下载）：Windows 版是主流程已下，Android 版兜底
@@ -71,7 +72,7 @@ object WorkerInstall {
                 append("opkg update")
                 Constants.OPKG_DEPS.forEach { append(" && opkg install ").append(it) }
             }
-            val connDep = ssh.connect(f.user, f.ip, f.port, f.password)
+            val connDep = ssh.connect(f.user, f.ip, port, f.password)
             if (connDep.isFailure) {
                 onLog("✗ SSH 连接失败：${connDep.exceptionOrNull()?.message ?: connDep.exceptionOrNull()?.javaClass?.simpleName}")
                 return@worker Result.success(false)
@@ -91,7 +92,7 @@ object WorkerInstall {
 
             // --- 步骤 2/4：SCP 推送 2 文件到 /tmp/ ---
             onLog("==================== 步骤 2/4：SCP 推送文件到 /tmp/ ====================")
-            val connScp = ssh.connect(f.user, f.ip, f.port, f.password)
+            val connScp = ssh.connect(f.user, f.ip, port, f.password)
             if (connScp.isFailure) {
                 onLog("✗ SSH 连接失败：${connScp.exceptionOrNull()?.message ?: connScp.exceptionOrNull()?.javaClass?.simpleName}")
                 return@worker Result.success(false)
@@ -118,7 +119,7 @@ object WorkerInstall {
             onLog("==================== 步骤 3/4：opkg 安装 ipk ====================")
             val ipkRemoteName = java.io.File(ipkLocal).name
             val installCmd = """opkg install --force-depends --force-overwrite --force-signature /tmp/$ipkRemoteName; echo ===VERIFY===; opkg list-installed"""
-            val conn3 = ssh.connect(f.user, f.ip, f.port, f.password)
+            val conn3 = ssh.connect(f.user, f.ip, port, f.password)
             if (conn3.isFailure) {
                 onLog("✗ SSH 连接失败：${conn3.exceptionOrNull()?.message ?: conn3.exceptionOrNull()?.javaClass?.simpleName}")
                 return@worker Result.success(false)
@@ -143,7 +144,7 @@ object WorkerInstall {
             // --- 步骤 4/4：解压内核到 /etc/openclash/core/ + 校验 KERNEL_OK ---
             onLog("==================== 步骤 4/4：解压内核到 /etc/openclash/core/ ====================")
             val kernelCmd = """mkdir -p /etc/openclash/core && tar -xzf /tmp/${Constants.KERNEL_FILE} -O > /etc/openclash/core/clash_meta && chmod +x /etc/openclash/core/clash_meta && ls -la /etc/openclash/core/clash_meta && echo KERNEL_OK"""
-            val conn4 = ssh.connect(f.user, f.ip, f.port, f.password)
+            val conn4 = ssh.connect(f.user, f.ip, port, f.password)
             if (conn4.isFailure) {
                 onLog("✗ SSH 连接失败：${conn4.exceptionOrNull()?.message ?: conn4.exceptionOrNull()?.javaClass?.simpleName}")
                 return@worker Result.success(false)
