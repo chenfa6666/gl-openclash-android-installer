@@ -26,7 +26,7 @@ class WorkerTestConn(
         }
 
         val cmd = "echo CONN_OK; echo HOST=\$(uname -n); echo UNAME=\$(uname -a)"
-        val res = ssh.execCommand(cmd)
+        val res = ssh.execCommand(cmd, timeoutMs = 20_000L)
         ssh.disconnect()
 
         if (res.isFailure) {

@@ -142,18 +142,18 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
             )
             PrimaryButton(
                 text = "开始安装",
-                onClick = {
-                    // 阶段 D：vm.install()
-                    vm.toast("阶段 D 接入：开始安装")
-                },
+                onClick = vm::install,
                 enabled = !state.busy,
+            )
+            androidx.compose.material3.Text(
+                "gl 专属功能",
+                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.tertiary,
             )
             PrimaryButton(
                 text = "安装风扇控制",
-                onClick = {
-                    // 阶段 E：vm.installFan()
-                    vm.toast("阶段 E 接入：安装风扇控制")
-                },
+                onClick = vm::installFan,
                 enabled = !state.busy,
                 variant = PrimaryButtonVariant.TONAL_OUTLINE,
             )

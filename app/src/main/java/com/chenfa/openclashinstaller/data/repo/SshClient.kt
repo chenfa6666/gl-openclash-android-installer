@@ -29,98 +29,39 @@ class SshClient(
 ) {
     private var session: Session? = null
 
-    // #region debug-point A:jsch-logger 初始化 JSch DEBUG Logger（用于采集 H1/H2/H3 证据）
-    companion object {
-        private var jschLoggerInit: Boolean = false
-        private fun ensureJschLogger() {
-            if (jschLoggerInit) return
-            jschLoggerInit = true
-            try {
-                JSch.setLogger(object : com.jcraft.jsch.Logger {
-                    override fun isEnabled(level: Int): Boolean = true
-                    override fun log(level: Int, message: String?) {
-                        val tag = when (level) {
-                            com.jcraft.jsch.Logger.DEBUG -> "DEBUG"
-                            com.jcraft.jsch.Logger.INFO -> "INFO"
-                            com.jcraft.jsch.Logger.WARN -> "WARN"
-                            com.jcraft.jsch.Logger.ERROR -> "ERROR"
-                            com.jcraft.jsch.Logger.FATAL -> "FATAL"
-                            else -> "LV$level"
-                        }
-                        // 证据路径：logcat（Android Studio Logcat 或 adb logcat 能抓到）
-                        val prio = when (level) {
-                            com.jcraft.jsch.Logger.ERROR, com.jcraft.jsch.Logger.FATAL -> android.util.Log.ERROR
-                            com.jcraft.jsch.Logger.WARN -> android.util.Log.WARN
-                            else -> android.util.Log.DEBUG
-                        }
-                        android.util.Log.println(prio, "JSch", "[$tag] ${message ?: "(null)"}")
-                        System.err.println("[JSch][$tag] ${message ?: "(null)"}")
-                    }
-                })
-            } catch (t: Throwable) { System.err.println("[JSch logger init fail] ${t.message}") }
-        }
-    }
-    // #endregion
-
     /** 等价 ssh -p port user@ip，密码认证（含 keyboard-interactive）。 */
     suspend fun connect(user: String, ip: String, port: Int, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                ensureJschLogger()
-                // #region debug-point B:connect-args 打印连接参数（脱敏密码，用于 H3/H5）
-                android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] connect(user=$user, ip=$ip, port=$port, pwdLen=${password.length})")
-                // #endregion
                 val jsch = JSch()
                 val s = jsch.getSession(user, ip, port)
                 s.setPassword(password)
-                // 关键：dropbear 用 keyboard-interactive，UserInfo 响应 challenge
+                // dropbear 默认走 keyboard-interactive；SimpleUserInfo.getPassword + promptPassword=true 双路响应
                 s.userInfo = SimpleUserInfo(password)
                 s.setConfig("StrictHostKeyChecking", "no")
                 s.setConfig("PreferredAuthentications", "password,keyboard-interactive,publickey")
-                // #region debug-point C:config-snapshot 快照 Config（用于 H3 StrictHostKeyChecking=no 是否生效）
-                android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] StrictHostKeyChecking=${s.getConfig("StrictHostKeyChecking")} PreferredAuths=${s.getConfig("PreferredAuthentications")}")
-                // #endregion
                 s.connect(connectTimeoutMs)
-                // #region debug-point D:connect-ok 连接成功标记（用于排除 H5）
-                android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] connect OK: clientVersion=${s.clientVersion} serverVersion=${s.serverVersion}")
-                // #endregion
                 session = s
                 Result.success(Unit)
             } catch (e: Throwable) {
-                // #region debug-point E:connect-fail 失败堆栈（用于最终判定 5 个假设）
-                val sb = StringBuilder()
-                sb.append("[DEBUG ssh-connect-fail] connect FAIL: type=${e.javaClass.name} msg=${e.message}\n")
-                var t: Throwable? = e
-                var depth = 0
-                while (t != null && depth < 6) {
-                    sb.append("  cause[$depth]: ${t.javaClass.name}: ${t.message}\n")
-                    t.cause?.stackTrace?.take(4)?.forEach { sb.append("    at $it\n") }
-                    t = t.cause
-                    depth++
-                }
-                android.util.Log.e("SshClient", sb.toString())
-                // #endregion
                 Result.failure(e)
             }
         }
 
     /**
-     * 执行单条命令。
-     * 等价 ssh ... "cmd"。
+     * 执行单条命令，等价 ssh ... "cmd"。
      *
-     * 历史坑总结（已踩的三次）：
-     *   ① ch.inputStream.use { it.readBytes() } → dropbear 不返回 EOF，阻塞 44 秒被 session 超时光断
-     *   ② available()/isEOF() 轮询退出 → race：isEOF 为 true 时 JSch IO 线程还没把字节 flush 进
-     *      InputStream 缓冲，loops=1 bytes=0 丢了 stdout
-     *   ③ 为修②加 input.read() 兜底 → JSch 在 isEOF=true 时 read() 依然阻塞 8+ 秒，死锁
+     * 实现：`ch.setOutputStream(baos)` 让 JSch 内部 IO 线程直接把远端 stdout 写进 ByteArrayOutputStream，
+     * 我们不再自行读 InputStream（JSch+dropbear 上 isEOF/available/read 都有竞态）。
+     * 只轮询 `ch.isClosed`：为 true 时所有字节已写完 + exitStatus 已可用（JSch 文档约定）。
      *
-     * 终极修复：使用 JSch 原生 ch.setOutputStream(baos)。JSch 内部 IO 线程把远端 stdout 字节
-     * 直接写入我们给的 ByteArrayOutputStream；我们**不自己读 InputStream**，零竞态零阻塞。
-     * 只等 isClosed=true（JSch 文档：isClosed 时 stdout 所有字节都已写完 + exitStatus 可用）。
-     *
-     * @return (exitCode, stdout) exitCode=-1 表示 channel 异常退出未拿到 exit status
+     * @param timeoutMs 最长等待远端 channel 关闭；超时后把已收到的字节 + exitStatus=-1 返回。
+     * @return (exitCode, stdout) exitCode=-1 表示超时/异常未拿到 exit status
      */
-    suspend fun execCommand(cmd: String): Result<Pair<Int, String>> = withContext(Dispatchers.IO) {
+    suspend fun execCommand(
+        cmd: String,
+        timeoutMs: Long = 15_000L,
+    ): Result<Pair<Int, String>> = withContext(Dispatchers.IO) {
         val s = session ?: return@withContext Result.failure(IllegalStateException("SSH 未连接"))
         try {
             val ch = s.openChannel("exec") as ChannelExec
@@ -133,42 +74,20 @@ class SshClient(
             ch.connect(connectTimeoutMs)
             try {
                 val t0 = System.currentTimeMillis()
-                // #region debug-point F:exec-wait 等待 isClosed（JSch 文档：关闭=所有字节已写+exitStatus 可用）
                 var waits = 0
-                // #endregion
                 while (!ch.isClosed) {
                     coroutineContext.ensureActive()
-                    if (System.currentTimeMillis() - t0 > 15_000) {
-                        android.util.Log.w("SshClient",
-                            "[DEBUG ssh-connect-fail] exec-wait timeout(15s): waits=$waits bytes=${baos.size()} exit=${ch.exitStatus}")
-                        break
-                    }
+                    if (System.currentTimeMillis() - t0 > timeoutMs) break
                     Thread.sleep(20)
                     waits++
                 }
                 val code = ch.exitStatus
-                val totalRead = baos.size()
                 val out = baos.toString(Charsets.UTF_8.name())
-                android.util.Log.d("SshClient",
-                    "[DEBUG ssh-connect-fail] exec done: waits=$waits bytes=$totalRead isClosed=${ch.isClosed} exit=$code")
-                // #endregion
                 Result.success(code to out)
             } finally {
                 ch.disconnect()
             }
         } catch (e: Throwable) {
-            // #region debug-point G:exec-fail exec 阶段失败
-            val sb = StringBuilder()
-            sb.append("[DEBUG ssh-connect-fail] exec FAIL: type=${e.javaClass.name} msg=${e.message}\n")
-            var t: Throwable? = e
-            var depth = 0
-            while (t != null && depth < 4) {
-                sb.append("  cause[$depth]: ${t.javaClass.name}: ${t.message}\n")
-                t = t.cause
-                depth++
-            }
-            android.util.Log.e("SshClient", sb.toString())
-            // #endregion
             Result.failure(e)
         }
     }

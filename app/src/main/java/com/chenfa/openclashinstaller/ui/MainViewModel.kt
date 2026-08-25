@@ -16,6 +16,8 @@ import com.chenfa.openclashinstaller.data.model.UiState
 import com.chenfa.openclashinstaller.data.repo.Downloader
 import com.chenfa.openclashinstaller.data.repo.SshClient
 import com.chenfa.openclashinstaller.domain.WorkerDownload
+import com.chenfa.openclashinstaller.domain.WorkerFan
+import com.chenfa.openclashinstaller.domain.WorkerInstall
 import com.chenfa.openclashinstaller.domain.WorkerTestConn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -167,6 +169,52 @@ class MainViewModel(
             s.fields.port.toIntOrNull() ?: 22,
             s.fields.password,
         )
+    }
+
+    /** 4 步安装 OpenClash（依赖 → SCP → opkg → 内核）。 */
+    fun install() = launchOp(OpId.INSTALL) {
+        val s = _uiState.value
+        if (!s.fields.isComplete()) {
+            appendLog("✗ 请先在设置中填写 用户名 / IP / 密码 / 端口", LogKind.ERROR)
+            return@launchOp
+        }
+        val r = WorkerInstall.execute(
+            ssh = ssh,
+            downloader = downloader,
+            appConfig = appConfig,
+            fields = s.fields,
+            urls = Triple(s.kernelUrl, s.openclashUrl, s.fanUrl),
+            onLog = { appendLog(it) },
+            onProgress = { appendProgressLog(it) },
+        )
+        if (r.getOrNull() == true) {
+            appendLog("✓ 安装完成", LogKind.SUCCESS)
+        } else if (!r.isSuccess) {
+            appendLog("✗ 安装流程异常结束", LogKind.ERROR)
+        }
+    }
+
+    /** 3 步安装风扇控制（GL.iNet 专属）。 */
+    fun installFan() = launchOp(OpId.FAN) {
+        val s = _uiState.value
+        if (!s.fields.isComplete()) {
+            appendLog("✗ 请先在设置中填写 用户名 / IP / 密码 / 端口", LogKind.ERROR)
+            return@launchOp
+        }
+        val r = WorkerFan.execute(
+            ssh = ssh,
+            downloader = downloader,
+            appConfig = appConfig,
+            fields = s.fields,
+            fanUrl = s.fanUrl,
+            onLog = { appendLog(it) },
+            onProgress = { appendProgressLog(it) },
+        )
+        if (r.getOrNull() == true) {
+            appendLog("✓ 风扇控制安装完成", LogKind.SUCCESS)
+        } else if (!r.isSuccess) {
+            appendLog("✗ 风扇控制安装流程异常结束", LogKind.ERROR)
+        }
     }
 
     fun abort() {
