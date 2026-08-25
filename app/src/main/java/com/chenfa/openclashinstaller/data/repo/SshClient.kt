@@ -29,21 +29,77 @@ class SshClient(
 ) {
     private var session: Session? = null
 
+    // #region debug-point A:jsch-logger 初始化 JSch DEBUG Logger（用于采集 H1/H2/H3 证据）
+    companion object {
+        private var jschLoggerInit: Boolean = false
+        private fun ensureJschLogger() {
+            if (jschLoggerInit) return
+            jschLoggerInit = true
+            try {
+                JSch.setLogger(object : com.jcraft.jsch.Logger {
+                    override fun isEnabled(level: Int): Boolean = true
+                    override fun log(level: Int, message: String?) {
+                        val tag = when (level) {
+                            com.jcraft.jsch.Logger.DEBUG -> "DEBUG"
+                            com.jcraft.jsch.Logger.INFO -> "INFO"
+                            com.jcraft.jsch.Logger.WARN -> "WARN"
+                            com.jcraft.jsch.Logger.ERROR -> "ERROR"
+                            com.jcraft.jsch.Logger.FATAL -> "FATAL"
+                            else -> "LV$level"
+                        }
+                        // 证据路径：logcat（Android Studio Logcat 或 adb logcat 能抓到）
+                        val prio = when (level) {
+                            com.jcraft.jsch.Logger.ERROR, com.jcraft.jsch.Logger.FATAL -> android.util.Log.ERROR
+                            com.jcraft.jsch.Logger.WARN -> android.util.Log.WARN
+                            else -> android.util.Log.DEBUG
+                        }
+                        android.util.Log.println(prio, "JSch", "[$tag] ${message ?: "(null)"}")
+                        System.err.println("[JSch][$tag] ${message ?: "(null)"}")
+                    }
+                })
+            } catch (t: Throwable) { System.err.println("[JSch logger init fail] ${t.message}") }
+        }
+    }
+    // #endregion
+
     /** 等价 ssh -p port user@ip，密码认证（含 keyboard-interactive）。 */
     suspend fun connect(user: String, ip: String, port: Int, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
+                ensureJschLogger()
+                // #region debug-point B:connect-args 打印连接参数（脱敏密码，用于 H3/H5）
+                android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] connect(user=$user, ip=$ip, port=$port, pwdLen=${password.length})")
+                // #endregion
                 val jsch = JSch()
                 val s = jsch.getSession(user, ip, port)
                 s.setPassword(password)
                 // 关键：dropbear 用 keyboard-interactive，UserInfo 响应 challenge
                 s.userInfo = SimpleUserInfo(password)
                 s.setConfig("StrictHostKeyChecking", "no")
-                s.setConfig("PreferredAuthentications", "password,keyboard-interactive")
+                s.setConfig("PreferredAuthentications", "password,keyboard-interactive,publickey")
+                // #region debug-point C:config-snapshot 快照 Config（用于 H3 StrictHostKeyChecking=no 是否生效）
+                android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] StrictHostKeyChecking=${s.getConfig("StrictHostKeyChecking")} PreferredAuths=${s.getConfig("PreferredAuthentications")}")
+                // #endregion
                 s.connect(connectTimeoutMs)
+                // #region debug-point D:connect-ok 连接成功标记（用于排除 H5）
+                android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] connect OK: clientVersion=${s.clientVersion} serverVersion=${s.serverVersion}")
+                // #endregion
                 session = s
                 Result.success(Unit)
             } catch (e: Throwable) {
+                // #region debug-point E:connect-fail 失败堆栈（用于最终判定 5 个假设）
+                val sb = StringBuilder()
+                sb.append("[DEBUG ssh-connect-fail] connect FAIL: type=${e.javaClass.name} msg=${e.message}\n")
+                var t: Throwable? = e
+                var depth = 0
+                while (t != null && depth < 6) {
+                    sb.append("  cause[$depth]: ${t.javaClass.name}: ${t.message}\n")
+                    t.cause?.stackTrace?.take(4)?.forEach { sb.append("    at $it\n") }
+                    t = t.cause
+                    depth++
+                }
+                android.util.Log.e("SshClient", sb.toString())
+                // #endregion
                 Result.failure(e)
             }
         }
