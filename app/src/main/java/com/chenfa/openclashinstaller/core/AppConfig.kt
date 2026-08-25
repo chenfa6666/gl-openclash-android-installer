@@ -20,7 +20,18 @@ class AppConfig(private val filesDir: File) {
     /** 通用 glob 查找：* 任意字符，按文件名匹配。当找不到时返回 null。 */
     fun findFileByGlob(glob: String): File? {
         if (!filesDir.isDirectory) return null
-        val re = Regex(Regex.escape(glob).replace("\\*", ".*"))
+        // 正确：按 '*' 分段，每段单独 Regex.escape，再用 ".*" 拼接，避免 Regex.escape(整个串) 把
+        // '*' 塞在 \Q...\E 字面量里导致后续字符串替换找不到 \* 而通配失效。
+        val segments = glob.split('*')
+        val regexStr = buildString {
+            append('^')
+            segments.forEachIndexed { i, seg ->
+                append(Regex.escape(seg))
+                if (i < segments.lastIndex) append(".*")
+            }
+            append('$')
+        }
+        val re = Regex(regexStr)
         return filesDir.listFiles()?.firstOrNull { it.isFile && re.matches(it.name) }
     }
 
