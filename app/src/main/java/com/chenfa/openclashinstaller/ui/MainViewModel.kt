@@ -43,7 +43,14 @@ class MainViewModel(
     fun init0() {
         viewModelScope.launch {
             val s = settingsStore.snapshot()
-            _uiState.update { it.copy(fields = s.fields) }
+            _uiState.update {
+                it.copy(
+                    fields = s.fields,
+                    kernelUrl = s.kernelUrl,
+                    openclashUrl = s.openclashUrl,
+                    fanUrl = s.fanUrl,
+                )
+            }
             refreshEnv()
         }
     }
@@ -75,8 +82,8 @@ class MainViewModel(
 
     // ----- 设置对话框 -----
 
-    fun openSettings() = _events.trySend(UiEvent.OpenSettings)
-    fun closeSettings() = _events.trySend(UiEvent.CloseSettings)
+    fun openSettings() = _uiState.update { it.copy(settingsOpen = true) }
+    fun closeSettings() = _uiState.update { it.copy(settingsOpen = false) }
 
     fun saveSettings(kernelUrl: String, openclashUrl: String, fanUrl: String, fields: ConnFields) {
         viewModelScope.launch {
@@ -89,16 +96,23 @@ class MainViewModel(
                     fields = fields,
                 )
             )
-            _uiState.update { it.copy(fields = fields) }
-            _events.trySend(UiEvent.CloseSettings)
+            _uiState.update {
+                it.copy(
+                    fields = fields,
+                    kernelUrl = kernelUrl,
+                    openclashUrl = openclashUrl,
+                    fanUrl = fanUrl,
+                    settingsOpen = false,
+                )
+            }
             _events.trySend(UiEvent.Toast("设置已保存"))
         }
     }
 
-    fun openAbout() = _events.trySend(UiEvent.OpenAbout)
-    fun closeAbout() = _events.trySend(UiEvent.CloseAbout)
-    fun openConfirmAbort() = _events.trySend(UiEvent.OpenConfirmAbort)
-    fun closeConfirmAbort() = _events.trySend(UiEvent.CloseConfirmAbort)
+    fun openAbout() = _uiState.update { it.copy(aboutOpen = true) }
+    fun closeAbout() = _uiState.update { it.copy(aboutOpen = false) }
+    fun openConfirmAbort() = _uiState.update { it.copy(confirmAbortOpen = true) }
+    fun closeConfirmAbort() = _uiState.update { it.copy(confirmAbortOpen = false) }
 
     // ----- 日志（阶段 C+ 完整接线，阶段 B 仅占位） -----
 
