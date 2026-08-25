@@ -23,6 +23,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      # Windows 起源的仓库，gradlew 没有 Linux 可执行位；chmod 确保 ubuntu 能跑
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
