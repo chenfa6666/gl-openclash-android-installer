@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -11,17 +13,46 @@ android {
         applicationId = "com.chenfa.openclashinstaller"
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0"
+    }
+
+    // 签名配置：从环境变量读 keystore（CI 通过 GitHub Secrets 注入）
+    // 没配置则兜底用 debug 签名，保证 CI 永不因签名缺失失败
+    val keystoreFile = System.getenv("SIGNING_KEYSTORE_FILE")
+    val keystorePass = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+    val keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+    val keyPass = System.getenv("SIGNING_KEY_PASSWORD")
+    val hasKeystore = !keystoreFile.isNullOrBlank() && File(keystoreFile).isFile
+
+    signingConfigs {
+        if (hasKeystore) {
+            create("release") {
+                storeFile = File(keystoreFile!!)
+                storePassword = keystorePass
+                this.keyAlias = keyAlias
+                keyPassword = keyPass
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 配了 keystore 用正式签名，否则兜底 debug 让 CI 不挂
+            signingConfig = if (hasKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
