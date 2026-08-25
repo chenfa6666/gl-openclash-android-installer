@@ -1,8 +1,11 @@
 package com.chenfa.openclashinstaller.ui
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chenfa.openclashinstaller.core.AppConfig
+import com.chenfa.openclashinstaller.core.Constants
 import com.chenfa.openclashinstaller.data.FileChecker
 import com.chenfa.openclashinstaller.data.FullLogBuffer
 import com.chenfa.openclashinstaller.data.LogFilter
@@ -19,7 +22,9 @@ import com.chenfa.openclashinstaller.domain.WorkerDownload
 import com.chenfa.openclashinstaller.domain.WorkerFan
 import com.chenfa.openclashinstaller.domain.WorkerInstall
 import com.chenfa.openclashinstaller.domain.WorkerTestConn
+import com.chenfa.openclashinstaller.domain.WorkerUnlockHidden
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +33,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * 主 ViewModel。
@@ -36,6 +44,7 @@ import kotlinx.coroutines.launch
  * 日志双轨制（完整缓冲 + 界面过滤）+ 进度单行原地刷新；currentJob 支持取消传播。
  */
 class MainViewModel(
+    private val appContext: Context,
     private val settingsStore: SettingsStore,
     private val fileChecker: FileChecker,
     private val fullLog: FullLogBuffer,
@@ -72,11 +81,14 @@ class MainViewModel(
 
     /** 刷新环境检查。等价 Windows 版 RefreshEnvCheck。 */
     fun refreshEnv() {
-        viewModelScope.launch {
-            val items = fileChecker.check()
-            val dl = fileChecker.downloadedFiles()
-            _uiState.update { it.copy(envStatus = items, downloadedFiles = dl) }
-        }
+        viewModelScope.launch { refreshEnvSync() }
+    }
+
+    /** 同步刷新（在已有 suspend 协程里调用，避免起新 job 异步不保证顺序）。 */
+    private suspend fun refreshEnvSync() {
+        val items = fileChecker.check()
+        val dl = fileChecker.downloadedFiles()
+        _uiState.update { it.copy(envStatus = items, downloadedFiles = dl) }
     }
 
     // ----- 操作编排（launchOp + 取消传播） -----
@@ -106,7 +118,7 @@ class MainViewModel(
                 appendLog("✗ 操作异常: ${e.message}", LogKind.ERROR)
             } finally {
                 _uiState.update { it.copy(busy = false, activeOp = null) }
-                refreshEnv()
+                refreshEnvSync()
             }
         }
     }
@@ -117,6 +129,7 @@ class MainViewModel(
         OpId.TESTCONN -> "连接测试"
         OpId.INSTALL -> "开始安装"
         OpId.FAN -> "安装风扇控制"
+        OpId.UNLOCK_HIDDEN -> "解锁隐藏功能"
     }
 
     /** 关闭操作弹窗（busy 时拒绝）。 */
@@ -135,11 +148,13 @@ class MainViewModel(
             onLog = { appendLog(it) },
             onProgress = { appendProgressLog(it) },
         )
-        worker.execute(
+        val ok = worker.execute(
             _uiState.value.kernelUrl,
             appConfig.localKernel.absolutePath,
             "内核",
         )
+        appendLog(if (ok) "✓ 内核下载完成" else "✗ 内核下载失败", if (ok) LogKind.SUCCESS else LogKind.ERROR)
+        refreshEnvSync()
     }
 
     fun downloadOpenclash() = launchOp(OpId.DL_OPENCLASH) {
@@ -149,11 +164,13 @@ class MainViewModel(
             onLog = { appendLog(it) },
             onProgress = { appendProgressLog(it) },
         )
-        worker.execute(
+        val ok = worker.execute(
             _uiState.value.openclashUrl,
             appConfig.localIpk.absolutePath,
             "OpenClash ipk",
         )
+        appendLog(if (ok) "✓ OpenClash ipk 下载完成" else "✗ OpenClash ipk 下载失败", if (ok) LogKind.SUCCESS else LogKind.ERROR)
+        refreshEnvSync()
     }
 
     fun testConn() = launchOp(OpId.TESTCONN) {
@@ -215,6 +232,118 @@ class MainViewModel(
         } else if (!r.isSuccess) {
             appendLog("✗ 风扇控制安装流程异常结束", LogKind.ERROR)
         }
+    }
+
+    /** 解锁 GL.iNet 管理界面隐藏菜单项（替换 lang_hide 中的 zh-cn → zh-tw）。 */
+    fun unlockHidden() = launchOp(OpId.UNLOCK_HIDDEN) {
+        val s = _uiState.value
+        if (!s.fields.isComplete()) {
+            appendLog("✗ 请先在设置中填写 用户名 / IP / 密码 / 端口", LogKind.ERROR)
+            return@launchOp
+        }
+        val r = WorkerUnlockHidden.execute(
+            ssh = ssh,
+            fields = s.fields,
+            onLog = { appendLog(it) },
+        )
+        if (r.getOrNull() == true) {
+            appendLog("✓ 解锁隐藏功能完成", LogKind.SUCCESS)
+        } else if (!r.isSuccess) {
+            appendLog("✗ 解锁流程异常结束", LogKind.ERROR)
+        }
+    }
+
+    /**
+     * 从手机本地导入 ipk / gz 文件到 app filesDir（顶栏导入按钮回调）。
+     *
+     * 规则：
+     *  · 文件名以 .tar.gz 结尾或 clash-linux-*.tar.gz 约定 → 作为内核，重命名为 KERNEL_FILE 默认名（若冲突覆盖）
+     *  · 文件名匹配 luci-app-openclash_*_all.ipk → 作为 openclash ipk，保留原名
+     *  · 文件名精确 == Constants.FAN_IPK_FILE → 作为风扇 ipk
+     *  · 其它 .ipk / .gz 也导入（只要扩展名对；list-installed 不校验文件名，内容对即可）
+     */
+    fun importLocalFile(uri: Uri) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val cr = appContext.contentResolver
+                    val displayName = queryDisplayName(cr, uri)
+                        ?: uri.lastPathSegment?.substringAfterLast('/')
+                        ?: throw IllegalArgumentException("无法获取文件名")
+                    val name = sanitizeFilename(displayName)
+                    val destName = canonicalizeDestName(name)
+                    val dest = File(appConfig.rootDir, destName)
+                    val buf = ByteArray(64 * 1024)
+                    var total = 0L
+                    cr.openInputStream(uri).use { input ->
+                        requireNotNull(input) { "内容提供者打开失败" }
+                        FileOutputStream(dest).use { out ->
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n <= 0) break
+                                out.write(buf, 0, n)
+                                total += n
+                            }
+                            out.flush()
+                        }
+                    }
+                    Triple(dest.name, total, recognizeKind(dest.name))
+                }.onSuccess { (name, bytes, kind) ->
+                    _events.trySend(
+                        UiEvent.Toast(
+                            "已导入 $name （${formatSizeSimple(bytes)}） → $kind"
+                        )
+                    )
+                }.onFailure { e ->
+                    _events.trySend(UiEvent.Toast("导入失败：${e.message ?: e.javaClass.simpleName}"))
+                }
+            }
+            refreshEnvSync()
+        }
+    }
+
+    /** 从 content resolver 拿原始文件名（不用 _displayName）。失败返回 null。 */
+    private fun queryDisplayName(cr: android.content.ContentResolver, uri: Uri): String? =
+        runCatching {
+            val proj = arrayOf(android.provider.OpenableColumns.DISPLAY_NAME)
+            cr.query(uri, proj, null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        }.getOrNull()
+
+    private fun sanitizeFilename(raw: String): String =
+        raw.replace('/', '_').replace('\u0000', '_').trim('_')
+
+    /** 归类：内核 / openclash ipk / 风扇 ipk / 未知 ipk / 未知 gz。 */
+    private fun canonicalizeDestName(name: String): String {
+        val lower = name.lowercase()
+        return when {
+            lower.endsWith(".tar.gz") -> {
+                // 如果文件名明确是 clash 内核（不是 openclash ipk 的 gz）→ 重命名为 KERNEL_FILE 让环境检查直接 YES
+                if (name.startsWith("clash-linux-")) Constants.KERNEL_FILE else name
+            }
+            lower == Constants.FAN_IPK_FILE.lowercase() -> Constants.FAN_IPK_FILE
+            lower.matches(Regex("luci-app-openclash_.+_all\\.ipk")) -> name
+            else -> name
+        }
+    }
+
+    private fun recognizeKind(name: String): String {
+        val lower = name.lowercase()
+        return when {
+            name == Constants.KERNEL_FILE || name.startsWith("clash-linux-") && name.endsWith(".tar.gz") -> "内核"
+            lower.matches(Regex("luci-app-openclash_.+_all\\.ipk")) -> "OpenClash ipk"
+            lower == Constants.FAN_IPK_FILE.lowercase() -> "风扇控制 ipk"
+            lower.endsWith(".ipk") -> "ipk（未识别类型）"
+            lower.endsWith(".gz") -> "压缩包（未识别）"
+            else -> "其它文件"
+        }
+    }
+
+    private fun formatSizeSimple(b: Long): String = when {
+        b >= 1024 * 1024 -> "%.2f MB".format(b / 1024.0 / 1024.0)
+        b >= 1024 -> "%.2f KB".format(b / 1024.0)
+        else -> "$b B"
     }
 
     fun abort() {

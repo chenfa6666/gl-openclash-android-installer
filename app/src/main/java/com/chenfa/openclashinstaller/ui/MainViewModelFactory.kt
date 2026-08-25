@@ -27,6 +27,7 @@ object MainViewModelFactory : ViewModelProvider.Factory {
             .build()
         @Suppress("UNCHECKED_CAST")
         return MainViewModel(
+            appContext = app,
             settingsStore = SettingsStore(app),
             fileChecker = FileChecker(config),
             fullLog = FullLogBuffer(),

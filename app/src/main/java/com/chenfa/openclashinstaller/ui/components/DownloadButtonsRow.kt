@@ -3,19 +3,19 @@ package com.chenfa.openclashinstaller.ui.components
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * 「下载内核」「下载 openclash」并排按钮。
- * 等价 Windows 版左侧顶部两按钮一行显示。
+ * 「下载内核」「下载 openclash」并排按钮（都填充主色，视觉对称）。
  */
 @Composable
 fun DownloadButtonsRow(
@@ -28,13 +28,14 @@ fun DownloadButtonsRow(
         Button(
             onClick = onKernel,
             enabled = enabled,
-            modifier = Modifier.weight(1f),
-        ) { Text("下载内核", style = MaterialTheme.typography.labelLarge) }
+            modifier = Modifier.weight(1f).height(48.dp),
+        ) { Text("下载内核", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.width(8.dp))
-        OutlinedButton(
+        Button(
             onClick = onOpenclash,
             enabled = enabled,
-            modifier = Modifier.weight(1f),
-        ) { Text("下载 openclash", style = MaterialTheme.typography.labelLarge) }
+            modifier = Modifier.weight(1f).height(48.dp),
+        ) { Text("下载 OpenClash", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
     }
 }
+

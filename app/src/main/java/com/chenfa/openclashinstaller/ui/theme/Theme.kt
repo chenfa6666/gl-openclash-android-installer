@@ -33,8 +33,23 @@ fun OpenClashTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colors.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            // 状态栏/导航栏统一跟应用 background（surface）一致，不再用 primary 撞色
+            val surfaceArgb = colors.background.toArgb()
+            window.statusBarColor = surfaceArgb
+            if (Build.VERSION.SDK_INT >= 27) {
+                window.navigationBarColor = surfaceArgb
+            }
+            val controller = WindowCompat.getInsetsController(window, view)
+            // 状态栏/导航栏图标色：亮色主题（亮 surface）→ 黑；暗色主题（暗 surface）→ 白
+            controller.isAppearanceLightStatusBars = !darkTheme
+            if (Build.VERSION.SDK_INT >= 26) {
+                controller.isAppearanceLightNavigationBars = !darkTheme
+            }
+            // 取消系统栏强制遮罩，做到真正的「颜色跟应用融为一体」
+            if (Build.VERSION.SDK_INT >= 29) {
+                window.isStatusBarContrastEnforced = false
+                window.isNavigationBarContrastEnforced = false
+            }
         }
     }
     MaterialTheme(
@@ -44,3 +59,5 @@ fun OpenClashTheme(
         content = content,
     )
 }
+
+

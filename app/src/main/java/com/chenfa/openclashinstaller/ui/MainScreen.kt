@@ -1,5 +1,8 @@
 package com.chenfa.openclashinstaller.ui
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -46,7 +49,7 @@ import com.chenfa.openclashinstaller.ui.components.SettingsDialog
 /**
  * 主屏幕 - 纯操作面板（无日志区）。
  *
- * 上：环境检查 + 下载按钮 + 当前连接摘要 + 操作按钮列表（连接测试 / 开始安装 / 安装风扇控制）
+ * 上：环境检查 + 下载按钮 + 当前连接摘要 + 操作按钮列表（连接测试 / 开始安装 / 安装风扇控制 / 解锁隐藏功能）
  * 点击操作按钮 → 弹出 OperationDialog 显示日志 + 强制结束按钮
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +57,13 @@ import com.chenfa.openclashinstaller.ui.components.SettingsDialog
 fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
+
+    // 从本地导入 ipk / gz 到 app filesDir（用户：下载箭头 → 导入）
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri != null) vm.importLocalFile(uri)
+    }
 
     LaunchedEffect(Unit) { vm.init0() }
 
@@ -75,8 +85,16 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     IconButton(onClick = { vm.openSettings() }) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
                     }
-                    IconButton(onClick = { /* 阶段 F：导出完整日志 */ }) {
-                        Icon(Icons.Default.Download, contentDescription = "导出日志")
+                    IconButton(
+                        onClick = {
+                            // 支持 .gz / .ipk / .tar.gz；系统选择器靠 MIME 兜底 */*
+                            importLauncher.launch(arrayOf("*/*"))
+                        },
+                    ) {
+                        Icon(
+                            Icons.Default.FileDownload,
+                            contentDescription = "本地导入 ipk / gz",
+                        )
                     }
                     IconButton(onClick = { vm.openAbout() }) {
                         Icon(Icons.Default.Info, contentDescription = "关于")
@@ -105,6 +123,12 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     onKernel = vm::downloadKernel,
                     onOpenclash = vm::downloadOpenclash,
                     enabled = !state.busy,
+                )
+                Text(
+                    "· 下载走网络；也可从右上 ↓ 按钮手动从手机导入 ipk / gz",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
 
@@ -145,7 +169,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 onClick = vm::install,
                 enabled = !state.busy,
             )
-            androidx.compose.material3.Text(
+            Text(
                 "gl 专属功能",
                 modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
                 style = MaterialTheme.typography.labelMedium,
@@ -155,7 +179,14 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 text = "安装风扇控制",
                 onClick = vm::installFan,
                 enabled = !state.busy,
-                variant = PrimaryButtonVariant.TONAL_OUTLINE,
+                variant = PrimaryButtonVariant.TONAL,
+            )
+            PrimaryButton(
+                text = "解锁隐藏功能",
+                onClick = vm::unlockHidden,
+                enabled = !state.busy,
+                variant = PrimaryButtonVariant.TONAL,
+                subtitle = "将 GL 管理界面中被 lang_hide 隐藏的菜单项改为中文可见（sed 替换 zh-cn → zh-tw）",
             )
         }
     }
@@ -197,3 +228,4 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
         )
     }
 }
+
