@@ -5,10 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -40,9 +38,11 @@ import com.chenfa.openclashinstaller.data.model.UiEvent
 import com.chenfa.openclashinstaller.ui.components.AboutDialog
 import com.chenfa.openclashinstaller.ui.components.CollapsibleCard
 import com.chenfa.openclashinstaller.ui.components.ConfirmAbortDialog
+import com.chenfa.openclashinstaller.ui.components.DownloadButtonsRow
 import com.chenfa.openclashinstaller.ui.components.EnvCheckRow
 import com.chenfa.openclashinstaller.ui.components.PrimaryButton
 import com.chenfa.openclashinstaller.ui.components.PrimaryButtonVariant
+import com.chenfa.openclashinstaller.ui.components.ProgressLog
 import com.chenfa.openclashinstaller.ui.components.SettingsDialog
 import com.chenfa.openclashinstaller.ui.theme.LogBg
 
@@ -51,11 +51,11 @@ import com.chenfa.openclashinstaller.ui.theme.LogBg
  *
  * 上 2/3：操作面板（可滚动）
  *   - 环境检查（折叠 Card，默认展开）
- *   - 下载（折叠 Card，默认展开；阶段 C 接入按钮）
- *   - 当前连接摘要 + 编辑按钮（点击打开设置对话框）
- *   - 阶段 C 起的操作按钮（连接测试/开始安装/强制结束/风扇控制）
+ *   - 下载（折叠 Card，下载内核 / 下载 openclash 按钮）
+ *   - 当前连接摘要 + 编辑按钮
+ *   - 连接测试 / 开始安装 / 强制结束 / 安装风扇控制 按钮
  *
- * 下 1/3：运行日志（可滚动，阶段 C+ 接入 ProgressLog）
+ * 下 1/3：运行日志（LazyColumn，进度行原地刷新，自动滚到底部）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,10 +63,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
 
-    // 首次进入：加载持久化设置 + 环境检查
-    LaunchedEffect(Unit) {
-        vm.init0()
-    }
+    LaunchedEffect(Unit) { vm.init0() }
 
     // 收集一次性事件（Toast）
     LaunchedEffect(Unit) {
@@ -112,20 +109,21 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                // 环境检查 - 可折叠
+                // 环境检查
                 CollapsibleCard(title = "环境检查", defaultExpanded = true) {
                     state.envStatus.forEach { EnvCheckRow(it) }
                 }
 
-                // 下载 - 可折叠
+                // 下载
                 CollapsibleCard(title = "下载", defaultExpanded = true) {
-                    Text(
-                        "（阶段 C 接入：下载内核 / 下载 openclash）",
-                        style = MaterialTheme.typography.bodyLarge,
+                    DownloadButtonsRow(
+                        onKernel = vm::downloadKernel,
+                        onOpenclash = vm::downloadOpenclash,
+                        enabled = !state.busy,
                     )
                 }
 
-                // 当前连接 - 紧凑摘要 + 编辑按钮
+                // 当前连接摘要 + 编辑按钮
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -139,10 +137,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "当前连接",
-                                style = MaterialTheme.typography.titleLarge,
-                            )
+                            Text("当前连接", style = MaterialTheme.typography.titleLarge)
                             Text(
                                 "${state.fields.user}@${state.fields.ip}:${state.fields.port}",
                                 style = MaterialTheme.typography.bodyLarge,
@@ -154,34 +149,58 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     }
                 }
 
-                // 阶段 C 起加入：连接测试 / 开始安装 / 强制结束 / 风扇控制按钮
-                // 当前阶段 B 仅占位
-                Text(
-                    "（阶段 C 起加入操作按钮）",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(8.dp),
+                // 操作按钮
+                PrimaryButton(
+                    text = "连接测试",
+                    onClick = vm::testConn,
+                    enabled = !state.busy,
+                )
+                PrimaryButton(
+                    text = "开始安装",
+                    onClick = {
+                        // 阶段 D：vm.install()
+                        snackbarHost.showSnackbar("阶段 D 接入：开始安装")
+                    },
+                    enabled = !state.busy,
+                )
+                PrimaryButton(
+                    text = "强制结束安装",
+                    onClick = { vm.openConfirmAbort() },
+                    enabled = state.busy,
+                    variant = PrimaryButtonVariant.ERROR,
+                )
+                PrimaryButton(
+                    text = "安装风扇控制",
+                    onClick = {
+                        // 阶段 E：vm.installFan()
+                        snackbarHost.showSnackbar("阶段 E 接入：安装风扇控制")
+                    },
+                    enabled = !state.busy,
+                    variant = PrimaryButtonVariant.TONAL_OUTLINE,
                 )
             }
 
-            // 下：运行日志（可滚动，浅米色背景，阶段 C+ 接入 ProgressLog）
+            // 下：运行日志（LazyColumn，进度行原地刷新）
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .background(LogBg)
-                    .padding(8.dp)
-                    .verticalScroll(rememberScrollState()),
-                contentAlignment = Alignment.TopStart,
+                    .background(LogBg),
             ) {
-                Text(
-                    "（阶段 C+ 接入：运行日志列表）",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                if (state.logEntries.isEmpty()) {
+                    Text(
+                        "（暂无日志）",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                } else {
+                    ProgressLog(entries = state.logEntries)
+                }
             }
         }
     }
 
-    // 对话框们
+    // 对话框
     if (state.settingsOpen) {
         SettingsDialog(
             initialKernelUrl = state.kernelUrl,
@@ -199,7 +218,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
         ConfirmAbortDialog(
             onConfirm = {
                 vm.closeConfirmAbort()
-                // 阶段 C+：vm.abort()
+                vm.abort()
             },
             onDismiss = vm::closeConfirmAbort,
         )
