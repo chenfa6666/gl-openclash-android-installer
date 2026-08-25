@@ -137,14 +137,14 @@ class SshClient(
                 while (true) {
                     coroutineContext.ensureActive()
                     loops++
-                    val avail = input.available()
-                    if (avail > 0) {
+                    // 内循环：有数据就吃干净（avail>0 时 read 不会阻塞）
+                    while (true) {
+                        val avail = input.available()
+                        if (avail <= 0) break
                         val n = input.read(buf, 0, minOf(buf.size, avail))
-                        if (n > 0) {
-                            baos.write(buf, 0, n)
-                            totalRead += n
-                        }
-                        continue
+                        if (n <= 0) break
+                        baos.write(buf, 0, n)
+                        totalRead += n
                     }
                     if (ch.isEOF || ch.isClosed) break
                     if (ch.exitStatus != -1) break // JSch 拿到 exit status 通常表示远端已退出
@@ -153,6 +153,20 @@ class SshClient(
                         break
                     }
                     Thread.sleep(50)
+                }
+                // 关键修复（race 兜底）：isEOF/isClosed 命中 break 后，JSch 内部接收线程
+                // 可能还没把最后的 stdout 字节刷进 InputStream 缓冲。bytes=0 loops=1 就是这个场景。
+                // 分两阶段：① available 狂读（非阻塞）② input.read() 阻塞单字节（isEOF 时无数据立即 -1）
+                for (i in 0 until 20) {
+                    val avail = input.available()
+                    if (avail > 0) {
+                        val n = input.read(buf, 0, minOf(buf.size, avail))
+                        if (n > 0) { baos.write(buf, 0, n); totalRead += n }
+                        continue
+                    }
+                    val b = input.read()
+                    if (b < 0) break
+                    baos.write(b); totalRead += 1
                 }
                 android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] exec done: loops=$loops bytes=$totalRead isEOF=${ch.isEOF} isClosed=${ch.isClosed} exit=${ch.exitStatus}")
                 // #endregion
