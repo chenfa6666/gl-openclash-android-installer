@@ -6,12 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,17 +31,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.chenfa.openclashinstaller.data.model.UiEvent
 import com.chenfa.openclashinstaller.ui.components.EnvCheckRow
 import com.chenfa.openclashinstaller.ui.components.LabeledTextField
 import com.chenfa.openclashinstaller.ui.components.PasswordField
 import com.chenfa.openclashinstaller.ui.theme.LogBg
 
 /**
- * 主屏幕。
+ * 主屏幕 - 上下布局。
  *
- * 阶段 B：左侧环境检查 4 行 + 输入字段（IP/用户/密码/端口）+ 右侧占位日志区。
- * 阶段 C+：加入下载/连接测试/开始安装/强制结束/风扇控制等按钮 + 日志列表。
+ * 上 1/3：操作面板（环境检查 + 下载 + 输入字段 + 后续阶段按钮），可滚动。
+ * 下 2/3：运行日志（浅米色背景，阶段 C+ 接入 ProgressLog + LogLine）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,18 +70,18 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
             )
         }
     ) { padding ->
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 左 1/3：操作面板
+            // 上：操作面板
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
             ) {
                 Text(
@@ -96,7 +93,6 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
 
                 Spacer(Modifier.height(8.dp))
 
-                // 阶段 C 起加入下载按钮
                 Text(
                     "下载",
                     style = MaterialTheme.typography.titleLarge,
@@ -139,11 +135,11 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 // 阶段 C 起加入连接测试 / 开始安装 / 强制结束 / 风扇控制按钮
             }
 
-            // 右 2/3：日志（浅米色背景，阶段 C+ 接入 ProgressLog + LogLine）
+            // 下：运行日志（浅米色背景，阶段 C+ 接入 ProgressLog + LogLine）
             Box(
                 modifier = Modifier
                     .weight(2f)
-                    .fillMaxHeight()
+                    .fillMaxWidth()
                     .background(LogBg)
                     .padding(8.dp),
                 contentAlignment = Alignment.Center,
