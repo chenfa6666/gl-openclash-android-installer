@@ -8,21 +8,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 解锁 GL.iNet 管理界面的隐藏菜单项（用户给定命令）。
+ * 解锁 GL.iNet 管理界面隐藏菜单项（用户指定命令）。
  *
- * 思路：GL.iNet 自带菜单配置放在 /usr/share/oui/menu.d/*.json 里；
- * 部分菜单项用 `"lang_hide": {"zh-cn": true, ...}` 方式在简体中文下隐藏。
- * 把紧随其后的 `"zh-cn"` 替换成 `"zh-tw"`，让简体中文版也能看到这些菜单项。
+ * 思路：GL.iNet 菜单 JSON 位于 /usr/share/oui/menu.d/，
+ * 部分菜单项用 "lang_hide" 字段在简体中文下隐藏。sed 把紧随其后的
+ * "zh-cn" 替换成 "zh-tw"，简体中文管理端即可看到。
  *
- * 命令原文（用户指定）：
+ * 用户给定原命令：
  *   find /usr/share/oui/menu.d -type f -name "*.json" \
  *       -exec sed -i '/"lang_hide"/{n;s/"zh-cn"/"zh-tw"/;}' {} +
- *
- * 校验：sed 替换后，再 grep 一遍被隐藏的 JSON。
  */
 object WorkerUnlockHidden {
 
-    private const val CMD = """find /usr/share/oui/menu.d -type f -name "*.json" -exec sed -i '/"lang_hide"/{n;s/"zh-cn"/"zh-tw"/;}' {} +"""
+    // 注意：用普通字符串（不用 triple-quote raw），避免 lexer 被 shell 引号 /
+    // 重定向符号 2>/dev/null 的 /* 触发误判为 block comment open。
+    private const val CMD =
+        "find /usr/share/oui/menu.d -type f -name \"*.json\" -exec sed -i " +
+        "'/\"lang_hide\"/{n;s/\"zh-cn\"/\"zh-tw\"/;}' {} +"
+
+    private const val VERIFY =
+        "grep -n -A1 '\"lang_hide\"' /usr/share/oui/menu.d/*.json " +
+        "2>/dev/null | head -n 80 || echo NO_FILES_OR_NO_MATCH"
 
     suspend fun execute(
         ssh: SshClient,
@@ -52,29 +58,25 @@ object WorkerUnlockHidden {
             onLog("==================== 步骤 2/2：校验结果 ====================")
             val conn2 = ssh.connect(fields.user, fields.ip, port, fields.password)
             if (conn2.isFailure) {
-                onLog("⚠ SSH 重连失败，跳过校验（结果可能已生效但无法确认）")
-                // sed 已成功，即使校验不到也当作成功
+                onLog("⚠ SSH 重连失败，跳过校验（sed 可能已生效）")
                 return@worker Result.success(true)
             }
-            // 校验：如果替换成功，menu.d 下 "lang_hide" 后紧跟 "zh-cn" 的情况应该只剩很少
-            // 这里只要 grep 能搜到 "zh-tw" 在 lang_hide 之后，就认为生效
-            val verify = """grep -n -A1 '"lang_hide"' /usr/share/oui/menu.d/*.json 2>/dev/null | head -n 80 || echo 'NO_FILES_OR_NO_MATCH'"""
-            val (c2, out2) = ssh.execCommand(verify, timeoutMs = 20_000L).getOrElse { (-1 to it.message.orEmpty()) }
+            val (c2, out2) = ssh.execCommand(VERIFY, timeoutMs = 20_000L).getOrElse { (-1 to it.message.orEmpty()) }
             runCatching { ssh.disconnect() }
             if (c2 != 0) {
                 onLog("⚠ 校验命令执行失败（exit=$c2），直接假定已替换完成")
             }
             val replacedTw = out2.lineSequence().filter { it.contains("zh-tw", ignoreCase = false) }.count()
             val remainingCn = out2.lineSequence().filter { it.contains("zh-cn", ignoreCase = false) }.count()
-            onLog("· 校验结果：lang_hide 下已转 zh-tw 的行数=$replacedTw，仍保留 zh-cn 的行数=$remainingCn")
+            onLog("· 校验结果：lang_hide 下 zh-tw 行数=$replacedTw，仍保留 zh-cn 行数=$remainingCn")
             out2.lineSequence().take(60).forEach { onLog("  $it") }
             if (replacedTw == 0 && remainingCn == 0) {
-                onLog("⚠ 没有检测到 lang_hide 匹配项（可能 menu.d 路径不同，或当前固件没有被隐藏的中文菜单）")
-                onLog("提示：如果管理界面仍看不到隐藏项，请登录 SSH 手动执行原命令确认。")
+                onLog("⚠ 未检测到 lang_hide 匹配项（menu.d 路径不同或当前固件无被隐藏菜单）")
+                onLog("提示：如管理界面仍看不到，请 SSH 登录后手动执行原命令确认。")
             }
 
             onLog("==================== 操作完成 ====================")
-            onLog("建议：退出 GL.iNet 管理后台重新登录（或清空浏览器缓存），隐藏菜单项即可显示。")
+            onLog("建议：退出 GL.iNet 管理后台重新登录（或清浏览器缓存），隐藏菜单项即可显示。")
             Result.success(true)
         } catch (ce: CancellationException) {
             onLog("! 已强制结束解锁")
