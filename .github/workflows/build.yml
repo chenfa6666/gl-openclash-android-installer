@@ -30,14 +30,18 @@ jobs:
       # ============== 正式版签名（仅当仓库 Secrets 配置了 SIGNING_KEYSTORE_BASE64 时生效） ==============
       # 没配置时 build.gradle.kts 自动兜底用 debug 签名，build 不会失败但 APK 不能升级安装。
       # 只要求 3 个 Secrets：SIGNING_KEYSTORE_BASE64 / SIGNING_PASSWORD / SIGNING_KEY_ALIAS（可选）
-      - name: Decode signing keystore
-        if: ${{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
+      - name: Decode signing keystore (if configured)
         env:
-          # 注意：GitHub Actions YAML 解析器对 secrets 的直接引用很敏感，用双引号包裹是官方推荐的避免解析错误的写法。
           SIGNING_KEYSTORE_BASE64: "${{ secrets.SIGNING_KEYSTORE_BASE64 }}"
           SIGNING_PASSWORD: "${{ secrets.SIGNING_PASSWORD }}"
           SIGNING_KEY_ALIAS: "${{ secrets.SIGNING_KEY_ALIAS }}"
         run: |
+          # 如果没有配置 keystore base64，跳过此步，后续 gradle 会兜底用 debug 签名
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "::warning::No SIGNING_KEYSTORE_BASE64 secret configured. Skipping release signing. APK will be signed with debug key."
+            exit 0
+          fi
+
           KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
           echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
           echo "SIGNING_KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
