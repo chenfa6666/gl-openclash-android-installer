@@ -90,6 +90,8 @@ class MainViewModel(
                 activeOp = op,
                 operationOpen = true,
                 operationTitle = opTitle(op),
+                logEntries = emptyList(),  // 清空界面日志：只显示本次操作
+                // 完整日志 fullLog 不清空（导出能查到所有历史）
             )
         }
         currentJob = viewModelScope.launch {

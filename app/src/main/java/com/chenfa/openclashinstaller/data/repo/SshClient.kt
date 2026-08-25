@@ -3,6 +3,7 @@ package com.chenfa.openclashinstaller.data.repo
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
+import com.jcraft.jsch.UserInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -19,20 +20,24 @@ import kotlin.coroutines.coroutineContext
  * 等价 Windows 版 ConPTY + ssh.exe + 应答 password: 的全部职责。
  *
  * 取消传播：协程 cancel 时 channel.connect/readBytes 抛异常，finally 调 disconnect。
+ *
+ * 关键：UserInfo 必须设置，否则 OpenWrt dropbear 默认的 keyboard-interactive 认证无法响应 challenge，
+ * 会导致 "Auth fail" 连接测试失败。
  */
 class SshClient(
     private val connectTimeoutMs: Int = 8000,
 ) {
     private var session: Session? = null
 
-    /** 等价 ssh -p port user@ip，密码认证。 */
+    /** 等价 ssh -p port user@ip，密码认证（含 keyboard-interactive）。 */
     suspend fun connect(user: String, ip: String, port: Int, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 val jsch = JSch()
                 val s = jsch.getSession(user, ip, port)
                 s.setPassword(password)
-                // JSch 无 accept-new，no 等价 StrictHostKeyChecking=accept-new
+                // 关键：dropbear 用 keyboard-interactive，UserInfo 响应 challenge
+                s.userInfo = SimpleUserInfo(password)
                 s.setConfig("StrictHostKeyChecking", "no")
                 s.setConfig("PreferredAuthentications", "password,keyboard-interactive")
                 s.connect(connectTimeoutMs)
@@ -61,6 +66,11 @@ class SshClient(
             try {
                 val out = ch.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
                 coroutineContext.ensureActive()
+                // 等 channel 完全关闭才能拿 exitStatus（JSch 文档：exitStatus 在 channel closed 后才可用）
+                val t0 = System.currentTimeMillis()
+                while (!ch.isClosed && System.currentTimeMillis() - t0 < 5000) {
+                    Thread.sleep(50)
+                }
                 val code = ch.exitStatus
                 Result.success(code to out)
             } finally {
@@ -125,4 +135,22 @@ class SshClient(
 private class NullOutputStream : java.io.OutputStream() {
     override fun write(b: Int) {}
     override fun write(b: ByteArray, off: Int, len: Int) {}
+}
+
+/**
+ * 简单 UserInfo：响应 keyboard-interactive challenge（dropbear 默认认证方式）。
+ *
+ * - promptPassword / promptYesNo 返回 true：自动接受
+ * - promptPassphrase 返回 false：不使用 passphrase
+ * - showMessage：空实现，不打扰 UI（日志由 WorkerTestConn 控制）
+ *
+ * 不实现 UIKeyboardInteractiveManager（JSch 默认会回退到 UserInfo.getPassword）
+ */
+private class SimpleUserInfo(private val password: String) : UserInfo {
+    override fun getPassphrase(): String? = null
+    override fun getPassword(): String = password
+    override fun promptPassword(message: String?): Boolean = true
+    override fun promptPassphrase(message: String?): Boolean = false
+    override fun promptYesNo(message: String?): Boolean = true
+    override fun showMessage(message: String?) {}
 }
