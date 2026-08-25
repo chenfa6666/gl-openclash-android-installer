@@ -7,6 +7,9 @@ import java.io.File
  * 等价 Windows 版 g_exeDir + FILE_*。
  */
 class AppConfig(private val filesDir: File) {
+    /** filesDir 公开引用，worker 里拼接派生路径时用（filesDir 本身是构造 private）。 */
+    val rootDir: File get() = filesDir
+
     val localKernel: File get() = File(filesDir, Constants.KERNEL_FILE)
     val localIpk: File get() = File(filesDir, Constants.OPENCLASH_IPK_DEFAULT)
     val localFan: File get() = File(filesDir, Constants.FAN_IPK_FILE)
