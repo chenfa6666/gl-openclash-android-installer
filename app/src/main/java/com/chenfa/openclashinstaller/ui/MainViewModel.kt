@@ -229,6 +229,9 @@ class MainViewModel(
     fun openConfirmAbort() = _uiState.update { it.copy(confirmAbortOpen = true) }
     fun closeConfirmAbort() = _uiState.update { it.copy(confirmAbortOpen = false) }
 
+    /** 触发一个 Toast 消息（通过 events Channel 投递，UI 收集后用 Snackbar 显示）。 */
+    fun toast(msg: String) = _events.trySend(UiEvent.Toast(msg))
+
     // ----- 日志双轨制（完整缓冲 + 界面过滤 + 进度原地刷新） -----
 
     /** 普通日志：完整缓冲 + 界面过滤后追加。 */

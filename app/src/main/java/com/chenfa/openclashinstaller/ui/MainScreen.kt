@@ -144,7 +144,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 text = "开始安装",
                 onClick = {
                     // 阶段 D：vm.install()
-                    snackbarHost.showSnackbar("阶段 D 接入：开始安装")
+                    vm.toast("阶段 D 接入：开始安装")
                 },
                 enabled = !state.busy,
             )
@@ -152,7 +152,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 text = "安装风扇控制",
                 onClick = {
                     // 阶段 E：vm.installFan()
-                    snackbarHost.showSnackbar("阶段 E 接入：安装风扇控制")
+                    vm.toast("阶段 E 接入：安装风扇控制")
                 },
                 enabled = !state.busy,
                 variant = PrimaryButtonVariant.TONAL_OUTLINE,
