@@ -1,0 +1,17 @@
+# Build
+/build/
+/app/build/
+/.gradle/
+/local.properties
+
+# IDE
+/.idea/
+/.vs/
+*.vsidx
+*.slnx
+.DS_Store
+captures/
+
+# Keystore
+*.jks
+*.keystore

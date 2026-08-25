@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="log_background">#FAF9F4</color>
+    <color name="env_ok">#00A000</color>
+    <color name="env_no">#C80000</color>
+    <color name="log_success">#008000</color>
+    <color name="log_error">#C80000</color>
+    <color name="log_warn">#B8860B</color>
+    <color name="log_normal">#282828</color>
+    <color name="ic_launcher_background">#1E88E5</color>
+</resources>
