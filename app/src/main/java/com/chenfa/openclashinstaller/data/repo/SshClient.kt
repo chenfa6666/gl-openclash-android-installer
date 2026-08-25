@@ -108,11 +108,15 @@ class SshClient(
      * 执行单条命令。
      * 等价 ssh ... "cmd"。
      *
-     * ⚠️ 历史坑：之前用 `ch.inputStream.use { it.readBytes() }` 会卡死 40+ 秒 ——
-     * dropbear/OpenWrt 在 stdout 输出完毕后不会立即给 JSch InputStream 发 EOF，readBytes() 硬阻塞等待，
-     * 直到 52 秒被 session 超时主动断开（logcat 中 "Caught an exception, leaving main loop due to Socket closed"）。
+     * 历史坑总结（已踩的三次）：
+     *   ① ch.inputStream.use { it.readBytes() } → dropbear 不返回 EOF，阻塞 44 秒被 session 超时光断
+     *   ② available()/isEOF() 轮询退出 → race：isEOF 为 true 时 JSch IO 线程还没把字节 flush 进
+     *      InputStream 缓冲，loops=1 bytes=0 丢了 stdout
+     *   ③ 为修②加 input.read() 兜底 → JSch 在 isEOF=true 时 read() 依然阻塞 8+ 秒，死锁
      *
-     * 修复：用 4KB 手动缓冲 + available()>0 批量读，否则每 50ms 轮询 ch.isEOF()/isClosed()，最长 15s 兜底。
+     * 终极修复：使用 JSch 原生 ch.setOutputStream(baos)。JSch 内部 IO 线程把远端 stdout 字节
+     * 直接写入我们给的 ByteArrayOutputStream；我们**不自己读 InputStream**，零竞态零阻塞。
+     * 只等 isClosed=true（JSch 文档：isClosed 时 stdout 所有字节都已写完 + exitStatus 可用）。
      *
      * @return (exitCode, stdout) exitCode=-1 表示 channel 异常退出未拿到 exit status
      */
@@ -121,62 +125,33 @@ class SshClient(
         try {
             val ch = s.openChannel("exec") as ChannelExec
             ch.setCommand(cmd)
-            // stderr 不混入 stdout（保持校验逻辑纯净）；用空丢弃流，
-            // 不用 java.io.OutputStream.nullOutputStream()（Java 11+ API，Android minSdk 28 没有）
+            // stderr 不混入 stdout（保持校验逻辑纯净）
             ch.setErrStream(NullOutputStream())
+            // stdout 交给 JSch 内部 IO 线程直接写 baos，不再自行读 inputStream
+            val baos = java.io.ByteArrayOutputStream(8192)
+            ch.setOutputStream(baos)
             ch.connect(connectTimeoutMs)
             try {
-                val input = ch.inputStream
-                val baos = java.io.ByteArrayOutputStream()
-                val buf = ByteArray(4096)
                 val t0 = System.currentTimeMillis()
-                // #region debug-point F:exec-read 命令执行读循环（排查卡死在哪个阶段）
-                var loops = 0
-                var totalRead = 0L
+                // #region debug-point F:exec-wait 等待 isClosed（JSch 文档：关闭=所有字节已写+exitStatus 可用）
+                var waits = 0
                 // #endregion
-                while (true) {
+                while (!ch.isClosed) {
                     coroutineContext.ensureActive()
-                    loops++
-                    // 内循环：有数据就吃干净（avail>0 时 read 不会阻塞）
-                    while (true) {
-                        val avail = input.available()
-                        if (avail <= 0) break
-                        val n = input.read(buf, 0, minOf(buf.size, avail))
-                        if (n <= 0) break
-                        baos.write(buf, 0, n)
-                        totalRead += n
-                    }
-                    if (ch.isEOF || ch.isClosed) break
-                    if (ch.exitStatus != -1) break // JSch 拿到 exit status 通常表示远端已退出
                     if (System.currentTimeMillis() - t0 > 15_000) {
-                        android.util.Log.w("SshClient", "[DEBUG ssh-connect-fail] exec read timeout(15s) loops=$loops total=$totalRead")
+                        android.util.Log.w("SshClient",
+                            "[DEBUG ssh-connect-fail] exec-wait timeout(15s): waits=$waits bytes=${baos.size()} exit=${ch.exitStatus}")
                         break
                     }
-                    Thread.sleep(50)
-                }
-                // 关键修复（race 兜底）：isEOF/isClosed 命中 break 后，JSch 内部接收线程
-                // 可能还没把最后的 stdout 字节刷进 InputStream 缓冲。bytes=0 loops=1 就是这个场景。
-                // 分两阶段：① available 狂读（非阻塞）② input.read() 阻塞单字节（isEOF 时无数据立即 -1）
-                for (i in 0 until 20) {
-                    val avail = input.available()
-                    if (avail > 0) {
-                        val n = input.read(buf, 0, minOf(buf.size, avail))
-                        if (n > 0) { baos.write(buf, 0, n); totalRead += n }
-                        continue
-                    }
-                    val b = input.read()
-                    if (b < 0) break
-                    baos.write(b); totalRead += 1
-                }
-                android.util.Log.d("SshClient", "[DEBUG ssh-connect-fail] exec done: loops=$loops bytes=$totalRead isEOF=${ch.isEOF} isClosed=${ch.isClosed} exit=${ch.exitStatus}")
-                // #endregion
-                // 等 channel 完全关闭才能拿 exitStatus（JSch 文档：exitStatus 在 channel closed 后才可用）
-                val tc0 = System.currentTimeMillis()
-                while (!ch.isClosed && System.currentTimeMillis() - tc0 < 3000) {
-                    Thread.sleep(30)
+                    Thread.sleep(20)
+                    waits++
                 }
                 val code = ch.exitStatus
+                val totalRead = baos.size()
                 val out = baos.toString(Charsets.UTF_8.name())
+                android.util.Log.d("SshClient",
+                    "[DEBUG ssh-connect-fail] exec done: waits=$waits bytes=$totalRead isClosed=${ch.isClosed} exit=$code")
+                // #endregion
                 Result.success(code to out)
             } finally {
                 ch.disconnect()
