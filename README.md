@@ -1,4 +1,22 @@
-# 安装Openclash for android
-本项目是在Android设备中通过ssh和scp给gl设备安装open clash
-内置在中文界面解锁隐藏功能
-为gl设备安装第三方风扇控制插件
+# OpenClash for GL 设备 - Android 端一键部署工具
+
+本项目提供基于 Android 设备通过 SSH/SCP 协议为 GL.iNet 系列路由器一键部署 OpenClash 代理的完整解决方案，同时集成中文管理界面功能解锁、第三方风扇控制插件安装等增强功能，全程无需电脑，移动端即可完成全部操作。
+
+## ✨ 功能特性
+
+- **一键安装 OpenClash**：通过 SSH + SCP 远程推送并安装 OpenClash 插件及其依赖，自动适配 GL 设备架构
+- **中文界面解锁**：解锁官方固件隐藏的中文管理界面，开启完整功能入口
+- **风扇控制插件**：集成第三方 `gl-fanctrl` 风扇调速插件，支持自定义温控策略
+
+## 📋 前置要求
+
+### 设备端
+
+- GL.iNet 系列路由器（已测试 GL-MT3600BE ）
+- 设备已开启 SSH 权限，已知 root 密码
+- 固件版本为官方
+- 设备与 Android 手机处于同一局域网
+
+### 手机端
+
+- Android 9.0 及以上系统
