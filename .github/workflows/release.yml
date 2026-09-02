@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布版本号（如 1.0.1、2.0.0），会自动写入 versionName + GitHub Release tag'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # ============== 替换版本号 ==============
+      # 从 tag 提取版本号：去掉可能的 v 前缀（v1.0.1 → 1.0.1）
+      # versionCode = tag 去掉点后的整数（1.0.1 → 101，2.0.0 → 200），保证递增
+      - name: Update version in build.gradle.kts
+        env:
+          INPUT_TAG: "${{ inputs.tag }}"
+        run: |
+          TAG="${INPUT_TAG#v}"
+          echo "Version: $TAG"
+
+          # versionCode：去点转整数，1.0.0 → 100，1.0.1 → 101，2.0.0 → 200
+          CODE=$(echo "$TAG" | tr -d '.')
+          # 补齐至少 3 位（防止 1.0 → 10 < 100 的历史 code）
+          while [ ${#CODE} -lt 3 ]; do CODE="${CODE}0"; done
+
+          echo "versionName=$TAG, versionCode=$CODE"
+
+          # sed 替换 build.gradle.kts 里的 versionCode 和 versionName
+          sed -i "s/versionCode = [0-9]*/versionCode = $CODE/" app/build.gradle.kts
+          sed -i "s/versionName = \"[^\"]*\"/versionName = \"$TAG\"/" app/build.gradle.kts
+
+          echo "----- 修改后的版本配置 -----"
+          grep -E 'version(Code|Name)' app/build.gradle.kts
+
+          # 保存到 GITHUB_ENV 供后续步骤使用
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "RELEASE_CODE=$CODE" >> "$GITHUB_ENV"
+
+      # ============== 正式版签名 ==============
+      - name: Decode signing keystore
+        env:
+          SIGNING_KEYSTORE_BASE64: "${{ secrets.SIGNING_KEYSTORE_BASE64 }}"
+          SIGNING_PASSWORD: "${{ secrets.SIGNING_PASSWORD }}"
+          SIGNING_KEY_ALIAS: "${{ secrets.SIGNING_KEY_ALIAS }}"
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "::warning::No SIGNING_KEYSTORE_BASE64 secret configured. APK will be signed with debug key."
+            exit 0
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+          echo "SIGNING_KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "SIGNING_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+          if [ -n "$SIGNING_KEY_ALIAS" ]; then
+            echo "SIGNING_KEY_ALIAS=$SIGNING_KEY_ALIAS" >> "$GITHUB_ENV"
+          else
+            echo "SIGNING_KEY_ALIAS=openclash" >> "$GITHUB_ENV"
+          fi
+          echo "Keystore decoded to $KEYSTORE_PATH (size: $(wc -c < "$KEYSTORE_PATH") bytes)"
+
+      # ============== 构建 release APK ==============
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      # ============== 重命名 APK ==============
+      - name: Rename APK to include version
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk \
+             app/build/outputs/apk/release/OpenClash-Installer-${{ env.RELEASE_TAG }}.apk
+          echo "APK renamed to OpenClash-Installer-${{ env.RELEASE_TAG }}.apk"
+
+      # ============== 发布 GitHub Release ==============
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        run: |
+          gh release create "v${{ env.RELEASE_TAG }}" \
+            --title "OpenClash 安装器 v${{ env.RELEASE_TAG }}" \
+            --notes "## OpenClash 安装器 v${{ env.RELEASE_TAG }}
+
+          ### 安装方法
+          1. 下载下方 APK 文件
+          2. 在 Android 手机上安装（允许未知来源）
+          3. 填写路由器 SSH 凭据，点「连接测试」
+          4. 下载内核 + OpenClash ipk
+          5. 点「开始安装」完成 4 步部署
+
+          ### 支持的路由器
+          - GL.iNet（GL-MT3600 等 OpenWrt 路由器）
+          - 其他 OpenWrt 路由器（需 dropbear SSH + opkg）
+
+          ### 版本信息
+          - versionName: ${{ env.RELEASE_TAG }}
+          - versionCode: ${{ env.RELEASE_CODE }}
+          " \
+            app/build/outputs/apk/release/OpenClash-Installer-${{ env.RELEASE_TAG }}.apk
+
+      # ============== 上传构建产物（artifact） ==============
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ env.RELEASE_TAG }}
+          path: app/build/outputs/apk/release/OpenClash-Installer-${{ env.RELEASE_TAG }}.apk
+          if-no-files-found: error
+
+      - name: Upload R8 mapping
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-mapping-${{ env.RELEASE_TAG }}
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
