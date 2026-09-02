@@ -23,7 +23,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
             Column {
                 Text("OpenClash 安装器", style = MaterialTheme.typography.titleLarge)
                 Text("版本: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-                Text("作者: chenfa")
+                Text("作者: chenfa6666")
+                Text("github: https://github.com/chenfa6666/gl-openclash-android-installer")
             }
         },
         confirmButton = {
