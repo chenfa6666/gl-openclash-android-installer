@@ -131,6 +131,7 @@ class MainViewModel(
         OpId.INSTALL -> "开始安装"
         OpId.FAN -> "安装风扇控制"
         OpId.UNLOCK_HIDDEN -> "解锁隐藏功能"
+        OpId.USB_TETHERING -> "USB 共享网络修复"
     }
 
     /** 关闭操作弹窗（busy 时拒绝）。 */
