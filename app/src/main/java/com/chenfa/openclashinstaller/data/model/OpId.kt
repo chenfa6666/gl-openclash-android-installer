@@ -7,6 +7,7 @@ enum class OpId {
     INSTALL,        // 4 步安装 OpenClash
     TESTCONN,       // 连接测试
     FAN,            // 风扇控制
-    UNLOCK_HIDDEN;  // 解锁 GL 隐藏菜单
+    UNLOCK_HIDDEN,  // 解锁 GL 隐藏菜单
+    USB_TETHERING;  // OPPO Reno5 Pro USB 共享网络修复
     val value: Int get() = ordinal + 1
 }

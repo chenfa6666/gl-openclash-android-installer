@@ -97,19 +97,18 @@ jobs:
           GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
           gh release create "v${{ env.RELEASE_TAG }}" \
-            --title "OpenClash 安装器 v${{ env.RELEASE_TAG }}" \
+            --title "v${{ env.RELEASE_TAG }}" \
             --notes "## OpenClash 安装器 v${{ env.RELEASE_TAG }}
 
           ### 安装方法
           1. 下载下方 APK 文件
-          2. 在 Android 手机上安装（允许未知来源）
+          2. 在 Android 手机上安装
           3. 填写路由器 SSH 凭据，点「连接测试」
           4. 下载内核 + OpenClash ipk
           5. 点「开始安装」完成 4 步部署
 
           ### 支持的路由器
-          - GL.iNet（GL-MT3600 等 OpenWrt 路由器）
-          - 其他 OpenWrt 路由器（需 dropbear SSH + opkg）
+          - GL.iNet（GL-MT3600BE 等 OpenWrt 路由器）
 
           ### 版本信息
           - versionName: ${{ env.RELEASE_TAG }}

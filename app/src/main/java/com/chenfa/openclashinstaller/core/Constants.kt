@@ -19,6 +19,9 @@ object Constants {
     const val OPENCLASH_IPK_GLOB = "luci-app-openclash_*_all.ipk"
     const val FAN_IPK_FILE = "gl-fanctrl_0.1.3_all.ipk"
 
+    // OPPO Reno5 Pro USB 共享网络修复 ipk（内置 assets，不下载）
+    const val USB_TETHERING_IPK = "kmod-usb-net-rndis-mediatek-4k-final_5.4.281-1_aarch64_cortex-a53.ipk"
+
     // 默认输入字段
     const val DEFAULT_IP = "192.168.8.1"
     const val DEFAULT_USER = "root"

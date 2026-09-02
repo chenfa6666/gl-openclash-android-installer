@@ -23,6 +23,7 @@ import com.chenfa.openclashinstaller.domain.WorkerFan
 import com.chenfa.openclashinstaller.domain.WorkerInstall
 import com.chenfa.openclashinstaller.domain.WorkerTestConn
 import com.chenfa.openclashinstaller.domain.WorkerUnlockHidden
+import com.chenfa.openclashinstaller.domain.WorkerUsbTethering
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -250,6 +251,27 @@ class MainViewModel(
             appendLog("✓ 解锁隐藏功能完成", LogKind.SUCCESS)
         } else if (!r.isSuccess) {
             appendLog("✗ 解锁流程异常结束", LogKind.ERROR)
+        }
+    }
+
+    /** 修复 OPPO Reno5 Pro USB 共享网络 bug（内置 ipk SCP 上传 + opkg install --force-reinstall）。 */
+    fun fixUsbTethering() = launchOp(OpId.USB_TETHERING) {
+        val s = _uiState.value
+        if (!s.fields.isComplete()) {
+            appendLog("✗ 请先在设置中填写 用户名 / IP / 密码 / 端口", LogKind.ERROR)
+            return@launchOp
+        }
+        val r = WorkerUsbTethering.execute(
+            ssh = ssh,
+            fields = s.fields,
+            appContext = appContext,
+            filesDir = appConfig.rootDir,
+            onLog = { appendLog(it) },
+        )
+        if (r.getOrNull() == true) {
+            appendLog("✓ USB 共享网络修复完成", LogKind.SUCCESS)
+        } else if (!r.isSuccess) {
+            appendLog("✗ USB 共享网络修复异常结束", LogKind.ERROR)
         }
     }
 

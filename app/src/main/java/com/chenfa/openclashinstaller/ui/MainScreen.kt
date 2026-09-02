@@ -188,6 +188,20 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 variant = PrimaryButtonVariant.TONAL,
                 subtitle = "将 GL 管理界面中被 lang_hide 隐藏的菜单项改为中文可见（sed 替换 zh-cn → zh-tw）",
             )
+
+            Text(
+                "修复 oppo reno5 pro usb 共享网络 bug",
+                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+            PrimaryButton(
+                text = "加载修复",
+                onClick = vm::fixUsbTethering,
+                enabled = !state.busy,
+                variant = PrimaryButtonVariant.TONAL,
+                subtitle = "内置修复版 RNDIS 内核模块，SCP 上传到 /tmp 后 opkg install --force-reinstall",
+            )
         }
     }
 
