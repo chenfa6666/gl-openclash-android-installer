@@ -99,36 +99,58 @@ class SshClient(
      * @param localPath 本地文件
      * @param remotePath 远端绝对路径，如 /tmp/clash-linux-arm64.tar.gz
      */
-    suspend fun scpUpload(localPath: String, remotePath: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            val s = session ?: return@withContext Result.failure(IllegalStateException("SSH 未连接"))
+    suspend fun scpUpload(
+        localPath: String,
+        remotePath: String,
+        timeoutMs: Long = 120_000L,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val s = session ?: return@withContext Result.failure(IllegalStateException("SSH 未连接"))
+        try {
+            val ch = s.openChannel("exec") as ChannelExec
+            // cat > '...' 落盘；远端 cat 二进制安全，能处理 ipk/tar.gz
+            ch.setCommand("cat > '${remotePath.replace("'", "'\\''")}'")
+            val out = ch.getOutputStream()  // 写远端 stdin
+            ch.connect(connectTimeoutMs)
             try {
-                val ch = s.openChannel("exec") as ChannelExec
-                // cat > '...' 落盘；远端 cat 二进制安全，能处理 ipk/tar.gz
-                ch.setCommand("cat > '${remotePath.replace("'", "'\\''")}'")
-                val out = ch.getOutputStream()  // 写远端 stdin
-                ch.connect(connectTimeoutMs)
-                try {
-                    File(localPath).inputStream().use { input ->
-                        val buf = ByteArray(64 * 1024)
-                        while (true) {
-                            coroutineContext.ensureActive()
-                            val n = input.read(buf)
-                            if (n <= 0) break
-                            out.write(buf, 0, n)
-                            out.flush()
-                        }
+                File(localPath).inputStream().use { input ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        coroutineContext.ensureActive()
+                        val n = input.read(buf)
+                        if (n <= 0) break
+                        out.write(buf, 0, n)
                     }
-                    out.close()  // 发 EOF，cat 落盘
-                    coroutineContext.ensureActive()
-                    Result.success(Unit)
-                } finally {
-                    ch.disconnect()
                 }
-            } catch (e: Throwable) {
-                Result.failure(e)
+                out.flush()
+                out.close()  // 发 EOF，通知远端 cat 输入结束
+
+                // 关键修复：必须等远端 cat 进程退出（ch.isClosed=true）才算落盘完成。
+                // 之前漏了这一步，ch.disconnect() 可能在 cat 还在刷盘时断开，
+                // 导致文件尾部截断 → MD5 变化。
+                val t0 = System.currentTimeMillis()
+                while (!ch.isClosed) {
+                    coroutineContext.ensureActive()
+                    if (System.currentTimeMillis() - t0 > timeoutMs) break
+                    Thread.sleep(20)
+                }
+
+                if (!ch.isClosed) {
+                    Result.failure(java.util.concurrent.TimeoutException("SCP 等待远端 cat 退出超时（${timeoutMs}ms），文件可能不完整"))
+                } else {
+                    val code = ch.exitStatus
+                    if (code != 0) {
+                        Result.failure(RuntimeException("远端 cat 退出码=$code，上传可能失败"))
+                    } else {
+                        Result.success(Unit)
+                    }
+                }
+            } finally {
+                ch.disconnect()
             }
+        } catch (e: Throwable) {
+            Result.failure(e)
         }
+    }
 
     /** 关闭会话。 */
     fun disconnect() {
