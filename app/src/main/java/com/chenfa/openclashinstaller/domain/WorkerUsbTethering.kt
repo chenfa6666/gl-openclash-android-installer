@@ -77,7 +77,8 @@ object WorkerUsbTethering {
             onLog("==================== 步骤 2/2：安装修复模块 ====================")
             val cmd = "opkg update && opkg install --force-reinstall $remotePath; echo ===VERIFY===; opkg list-installed | grep kmod-usb-net-rndis"
             onLog("· $cmd")
-            val (code, out) = ssh.execCommand(cmd, timeoutMs = 60_000L).getOrElse {
+            // opkg update + install 在 GL.iNet 上经常需要 2-3 分钟（拉 Packages.gz 索引慢）
+            val (code, out) = ssh.execCommand(cmd, timeoutMs = 180_000L).getOrElse {
                 (-1 to (it.message.orEmpty()))
             }
             runCatching { ssh.disconnect() }

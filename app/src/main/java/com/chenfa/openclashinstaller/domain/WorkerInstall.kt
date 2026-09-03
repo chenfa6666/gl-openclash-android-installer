@@ -77,7 +77,7 @@ object WorkerInstall {
                 onLog("✗ SSH 连接失败：${connDep.exceptionOrNull()?.message ?: connDep.exceptionOrNull()?.javaClass?.simpleName}")
                 return@worker Result.success(false)
             }
-            val r = ssh.execCommand(depCmd, timeoutMs = 90_000L).getOrElse { (-1 to it.message.orEmpty()) }
+            val r = ssh.execCommand(depCmd, timeoutMs = 180_000L).getOrElse { (-1 to it.message.orEmpty()) }
             val code = r.first; val cap = r.second
             if (code != 0 || !cap.containsCi(Constants.OPKG_DEPS_LAST)) {
                 onLog("⚠ 依赖安装未完全成功（exit=$code），后续 opkg 将启用 --force-depends 兜底")
@@ -124,7 +124,7 @@ object WorkerInstall {
                 onLog("✗ SSH 连接失败：${conn3.exceptionOrNull()?.message ?: conn3.exceptionOrNull()?.javaClass?.simpleName}")
                 return@worker Result.success(false)
             }
-            val (code3, cap3) = ssh.execCommand(installCmd, timeoutMs = 60_000L).getOrElse { (-1 to it.message.orEmpty()) }
+            val (code3, cap3) = ssh.execCommand(installCmd, timeoutMs = 180_000L).getOrElse { (-1 to it.message.orEmpty()) }
             try { ssh.disconnect() } catch (_: Throwable) {}
             val verIdx = cap3.indexOf("===VERIFY===")
             val after = if (verIdx < 0) cap3 else cap3.substring(verIdx)

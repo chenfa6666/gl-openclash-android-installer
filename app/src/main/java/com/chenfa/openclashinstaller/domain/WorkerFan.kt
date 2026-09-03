@@ -86,7 +86,7 @@ object WorkerFan {
                 onLog("✗ SSH 连接失败：${conn2.exceptionOrNull()?.message ?: conn2.exceptionOrNull()?.javaClass?.simpleName}")
                 return@fan Result.success(false)
             }
-            val (code, cap) = ssh.execCommand(installCmd, timeoutMs = 60_000L).getOrElse { (-1 to it.message.orEmpty()) }
+            val (code, cap) = ssh.execCommand(installCmd, timeoutMs = 180_000L).getOrElse { (-1 to it.message.orEmpty()) }
             runCatching { ssh.disconnect() }
             val verIdx = cap.indexOf("===VERIFY===")
             val after = if (verIdx < 0) cap else cap.substring(verIdx)
