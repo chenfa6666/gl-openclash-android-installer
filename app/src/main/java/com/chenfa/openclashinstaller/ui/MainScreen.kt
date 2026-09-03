@@ -125,7 +125,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     enabled = !state.busy,
                 )
                 Text(
-                    "· 下载走网络；也可从右上 ↓ 按钮手动从手机导入 ipk / gz",
+                    "·下载走网络；右上 ↓ 按钮手动从手机导入 ipk / gz",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
@@ -180,13 +180,14 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 onClick = vm::installFan,
                 enabled = !state.busy,
                 variant = PrimaryButtonVariant.TONAL,
+                subtitle = "安装完成在GL 管理界面 系统-风扇控制",
             )
             PrimaryButton(
                 text = "解锁隐藏功能",
                 onClick = vm::unlockHidden,
                 enabled = !state.busy,
                 variant = PrimaryButtonVariant.TONAL,
-                subtitle = "将 GL 管理界面中被 lang_hide 隐藏的菜单项改为中文可见（sed 替换 zh-cn → zh-tw）",
+                subtitle = "将 GL 管理界面中被 lang_hide 隐藏的菜单项改为中文可见",
             )
 
             Text(
@@ -200,7 +201,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 onClick = vm::fixUsbTethering,
                 enabled = !state.busy,
                 variant = PrimaryButtonVariant.TONAL,
-                subtitle = "内置修复版 RNDIS 内核模块，SCP 上传到 /tmp 后 opkg install --force-reinstall",
+                subtitle = "内置修复版 RNDIS 内核模块，修复完成手动重启路由器生效",
             )
         }
     }
