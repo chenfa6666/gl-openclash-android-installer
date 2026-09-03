@@ -36,7 +36,7 @@ object WorkerUsbTethering {
             ensureActiveOrCancel()
 
             // ---- 步骤 1/2：提取 assets 内置 ipk → filesDir → SCP 上传 ----
-            onLog("==================== 步骤 1/2：加载修复 ipk ====================")
+            onLog(" 步骤 1/2：加载修复 ipk ")
             val localFile = File(filesDir, Constants.USB_TETHERING_IPK)
             if (!localFile.isFile) {
                 onLog("· 从内置 assets 提取 ${Constants.USB_TETHERING_IPK}")
@@ -74,7 +74,7 @@ object WorkerUsbTethering {
             ensureActiveOrCancel()
 
             // ---- 步骤 2/2：opkg update + opkg install --force-reinstall ----
-            onLog("==================== 步骤 2/2：安装修复模块 ====================")
+            onLog(" 步骤 2/2：安装修复模块 ")
             val cmd = "opkg update && opkg install --force-reinstall $remotePath; echo ===VERIFY===; opkg list-installed | grep kmod-usb-net-rndis"
             onLog("· $cmd")
             // opkg update + install 在 GL.iNet 上经常需要 2-3 分钟（拉 Packages.gz 索引慢）
@@ -96,8 +96,8 @@ object WorkerUsbTethering {
                 return@worker Result.success(false)
             }
             onLog("✓ kmod-usb-net-rndis 已安装，修复完成")
-            onLog("==================== 修复成功 ====================")
-            onLog("提示：拔插一次 USB 线让模块重新加载，OPPO Reno5 Pro USB 共享网络应恢复正常。")
+            onLog(" 修复成功 ")
+            onLog("提示：重启路由器，OPPO Reno5 Pro USB 共享网络应恢复正常。")
             Result.success(true)
         } catch (ce: CancellationException) {
             onLog("! 已强制结束 USB 共享网络修复")

@@ -14,7 +14,7 @@ class WorkerTestConn(
     private val onLog: suspend (String) -> Unit,
 ) {
     suspend fun execute(ip: String, user: String, port: Int, password: String): ConnTestResult {
-        onLog("========== 连接测试 ==========")
+        onLog(" 连接测试 ")
         onLog("→ 正在连接 $user@$ip:$port ...")
 
         val conn = ssh.connect(user, ip, port, password)

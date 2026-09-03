@@ -21,7 +21,7 @@ class WorkerDownload(
      * @return true 下载成功
      */
     suspend fun execute(url: String, destPath: String, label: String): Boolean {
-        onLog("========== 下载 $label ==========")
+        onLog(" 下载 $label ")
         onLog("URL: $url")
         return try {
             downloader.download(url, destPath).collect { p ->

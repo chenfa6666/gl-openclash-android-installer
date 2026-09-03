@@ -39,7 +39,7 @@ object WorkerUnlockHidden {
             val port = fields.port.toIntOrNull() ?: 22
             ensureActiveOrCancel()
 
-            onLog("==================== 步骤 1/2：执行 sed 批量替换 ====================")
+            onLog(" 步骤 1/2：执行 sed 批量替换 ")
             val conn1 = ssh.connect(fields.user, fields.ip, port, fields.password)
             if (conn1.isFailure) {
                 onLog("✗ SSH 连接失败：${conn1.exceptionOrNull()?.message ?: conn1.exceptionOrNull()?.javaClass?.simpleName}")
@@ -55,7 +55,7 @@ object WorkerUnlockHidden {
             }
             onLog("✓ sed 替换完成")
 
-            onLog("==================== 步骤 2/2：校验结果 ====================")
+            onLog(" 步骤 2/2：校验结果 ")
             val conn2 = ssh.connect(fields.user, fields.ip, port, fields.password)
             if (conn2.isFailure) {
                 onLog("⚠ SSH 重连失败，跳过校验（sed 可能已生效）")
@@ -75,7 +75,7 @@ object WorkerUnlockHidden {
                 onLog("提示：如管理界面仍看不到，请 SSH 登录后手动执行原命令确认。")
             }
 
-            onLog("==================== 操作完成 ====================")
+            onLog(" 操作完成 ")
             onLog("建议：退出 GL.iNet 管理后台重新登录（或清浏览器缓存），隐藏菜单项即可显示。")
             Result.success(true)
         } catch (ce: CancellationException) {

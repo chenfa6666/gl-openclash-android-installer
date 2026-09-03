@@ -41,7 +41,7 @@ object WorkerFan {
             ensureActiveOrCancel()
 
             // --- 步骤 1/3：本地检查 → 下载 ---
-            onLog("==================== 步骤 1/3：准备 gl-fanctrl ipk ====================")
+            onLog(" 步骤 1/3：准备 gl-fanctrl ipk ")
             val localPath = appConfig.findFileExact(Constants.FAN_IPK_FILE)?.absolutePath
                 ?: appConfig.rootDir.resolve(Constants.FAN_IPK_FILE).absolutePath
             val localFile = File(localPath)
@@ -60,7 +60,7 @@ object WorkerFan {
             ensureActiveOrCancel()
 
             // --- 步骤 2/3：SCP 推送 ---
-            onLog("==================== 步骤 2/3：SCP 推送 ipk 到 /tmp/ ====================")
+            onLog(" 步骤 2/3：SCP 推送 ipk 到 /tmp/ ")
             val conn1 = ssh.connect(f.user, f.ip, port, f.password)
             if (conn1.isFailure) {
                 onLog("✗ SSH 连接失败：${conn1.exceptionOrNull()?.message ?: conn1.exceptionOrNull()?.javaClass?.simpleName}")
@@ -79,7 +79,7 @@ object WorkerFan {
             ensureActiveOrCancel()
 
             // --- 步骤 3/3：opkg 安装 + 严格校验 ---
-            onLog("==================== 步骤 3/3：opkg 安装 + 校验 ====================")
+            onLog(" 步骤 3/3：opkg 安装 + 校验 ")
             val installCmd = """opkg install --force-depends --force-overwrite --force-signature $remote; echo ===VERIFY===; opkg list-installed"""
             val conn2 = ssh.connect(f.user, f.ip, port, f.password)
             if (conn2.isFailure) {

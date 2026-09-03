@@ -67,7 +67,7 @@ object WorkerInstall {
             }
 
             // --- 步骤 1/4：SSH 装依赖 ---
-            onLog("==================== 步骤 1/4：安装 opkg 依赖 ====================")
+            onLog(" 步骤 1/4：安装 opkg 依赖 ")
             val depCmd = buildString {
                 append("opkg update")
                 Constants.OPKG_DEPS.forEach { append(" && opkg install ").append(it) }
@@ -91,7 +91,7 @@ object WorkerInstall {
             try { ssh.disconnect() } catch (_: Throwable) {}
 
             // --- 步骤 2/4：SCP 推送 2 文件到 /tmp/ ---
-            onLog("==================== 步骤 2/4：SCP 推送文件到 /tmp/ ====================")
+            onLog(" 步骤 2/4：SCP 推送文件到 /tmp/ ")
             val connScp = ssh.connect(f.user, f.ip, port, f.password)
             if (connScp.isFailure) {
                 onLog("✗ SSH 连接失败：${connScp.exceptionOrNull()?.message ?: connScp.exceptionOrNull()?.javaClass?.simpleName}")
@@ -116,7 +116,7 @@ object WorkerInstall {
             try { ssh.disconnect() } catch (_: Throwable) {}
 
             // --- 步骤 3/4：opkg 装 ipk + 严格校验 ---
-            onLog("==================== 步骤 3/4：opkg 安装 ipk ====================")
+            onLog(" 步骤 3/4：opkg 安装 ipk ")
             val ipkRemoteName = java.io.File(ipkLocal).name
             val installCmd = """opkg install --force-depends --force-overwrite --force-signature /tmp/$ipkRemoteName; echo ===VERIFY===; opkg list-installed"""
             val conn3 = ssh.connect(f.user, f.ip, port, f.password)
@@ -142,7 +142,7 @@ object WorkerInstall {
             ensureActiveOrCancel()
 
             // --- 步骤 4/4：解压内核到 /etc/openclash/core/ + 校验 KERNEL_OK ---
-            onLog("==================== 步骤 4/4：解压内核到 /etc/openclash/core/ ====================")
+            onLog(" 步骤 4/4：解压内核到 /etc/openclash/core/ ")
             val kernelCmd = """mkdir -p /etc/openclash/core && tar -xzf /tmp/${Constants.KERNEL_FILE} -O > /etc/openclash/core/clash_meta && chmod +x /etc/openclash/core/clash_meta && ls -la /etc/openclash/core/clash_meta && echo KERNEL_OK"""
             val conn4 = ssh.connect(f.user, f.ip, port, f.password)
             if (conn4.isFailure) {
@@ -161,7 +161,7 @@ object WorkerInstall {
             val lsLine = cap4.lineSequence().firstOrNull { it.contains("clash_meta") && it.contains("-rwx") }
             onLog("✓ 内核解压完成（${lsLine ?: "clash_meta 已就位"}，已校验 KERNEL_OK）")
 
-            onLog("==================== 安装成功 ====================")
+            onLog(" 安装成功 ")
             onLog("路由器管理地址：http://${f.ip}/")
             onLog("请登录 OpenWrt → 服务 → OpenClash 进行配置")
             Result.success(true)
