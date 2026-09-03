@@ -92,7 +92,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                         },
                     ) {
                         Icon(
-                            Icons.Default.FileDownload,
+                            Icons.Default.ArrowDownward,
                             contentDescription = "本地导入 ipk / gz",
                         )
                     }

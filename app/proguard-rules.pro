@@ -1,72 +1,49 @@
 # ===================== OpenClash 安装器 ProGuard 规则 =====================
+# 策略：只保留反射加载的类，让 R8 自由 tree-shake 其余代码。
+# 之前的 -keep @kotlin.Metadata class * { *; } 会保留所有 Kotlin 类 → tree-shake 失效。
 
 # ---------- JSch (mwiede fork) ----------
-# JSch 通过反射加载 KeyExchange/Cipher/MAC/Compression 等算法实现类，
-# R8 不知道这些类被反射使用，会删 → 连接 SSH 时 NoSuchMethodException。
+# JSch 用 Class.forName 按字符串名加载 KeyExchange/Cipher/MAC/Compression 算法实现，
+# R8 无法静态追踪字符串引用 → 必须保留全部算法类，否则 SSH 握手 NoSuchMethodException。
 -keep class com.jcraft.jsch.** { *; }
 -dontwarn com.jcraft.jsch.**
 
 # ---------- OkHttp / Okio ----------
-# OkHttp 用 Platform 反射查找 JDK 1.8+ HttpClient 等平台类，
-# 同时 okio 用 ByteString 反射，必须保留。
--keep class okhttp3.** { *; }
--keep class okio.** { *; }
+# OkHttp Platform 类用 Class.forName 探测 JDK/Conscrypt 平台 TLS，只保留探测链。
+# 其余 OkHttp 类（logging, mockwebserver 等）让 R8 自由 shrink。
+-keep class okhttp3.internal.platform.** { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
 
 # ---------- Kotlin Coroutines ----------
-# 协程挂起恢复时通过 Continuation 续体反射恢复 lambda 状态，
-# 去掉会导致 launchOp / ensureActiveOrCancel 在边界处失败。
--keep class kotlinx.coroutines.** { *; }
+# Kotlin Gradle 插件已自带协程状态机 keep 规则，此处仅防 warn + 保留状态字段。
 -dontwarn kotlinx.coroutines.**
--keep class kotlin.coroutines.** { *; }
--keep class kotlin.coroutines.intrinsics.** { *; }
-# 协程状态机：带 $| 状态字段的 lambda 闭包类不能被删
--keepclassmembers class kotlin.coroutines.SafeContinuation { *; }
 -keepclassmembers class kotlinx.coroutines.*State* { *; }
 
 # ---------- Kotlin Metadata ----------
-# 反射（DataStore / 协程）需要 @Metadata 注解内容读取 Kotlin 类型信息
--keep @kotlin.Metadata class * { *; }
+# 只保留注解类本身；不要 keep 所有带 @Metadata 的类（那会禁用全部 Kotlin tree-shake）。
+-keep class kotlin.Metadata { *; }
 -keepclassmembers class * {
     @kotlin.Metadata *;
 }
 
 # ---------- DataStore Preferences ----------
-# Preferences DataStore 内部用 protobuf-like 序列化反序列化键值
--keep class androidx.datastore.** { *; }
+# Preferences DataStore 不使用 protobuf（自有序列化格式），protobuf 可被 R8 移除。
+-keep class androidx.datastore.preferences.** { *; }
 -dontwarn androidx.datastore.**
--keep class com.google.protobuf.** { *; }
 -dontwarn com.google.protobuf.**
 
-# ---------- Compose ----------
-# Compose Compiler 已自带规则；保险起见保留 runtime / material3
--keep class androidx.compose.runtime.** { *; }
--keep class androidx.compose.material3.** { *; }
--dontwarn androidx.compose.**
-
 # ---------- App 入口 / 反射调用的类 ----------
-# Application / MainActivity 通过 AndroidManifest 反射实例化
 -keep class com.chenfa.openclashinstaller.App { *; }
 -keep class com.chenfa.openclashinstaller.MainActivity { *; }
 -keep class com.chenfa.openclashinstaller.** { <init>(); }
 -keep class com.chenfa.openclashinstaller.data.model.** { *; }
 -keep class com.chenfa.openclashinstaller.core.Constants { *; }
 
-# ---------- 通用：保留注解、原生方法、枚举 ----------
--keepattributes Signature
--keepattributes InnerClasses
--keepattributes EnclosingMethod
--keepattributes RuntimeVisibleAnnotations
--keepattributes RuntimeVisibleParameterAnnotations
--keepattributes AnnotationDefault
--keepattributes Exceptions
-
--keepclasseswithmembernames class * {
-    native <methods>;
-}
--keepclassmembers enum * {
-    public static **[] values();
-    public static ** valueOf(java.lang.String);
-}
+# ---------- 通用 ----------
+-keepattributes Signature,InnerClasses,EnclosingMethod,RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,AnnotationDefault,Exceptions
+-keepclasseswithmembernames class * { native <methods>; }
+-keepclassmembers enum * { public static **[] values(); public static ** valueOf(java.lang.String); }
