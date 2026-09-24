@@ -1,4 +1,5 @@
 import java.io.File
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,9 +7,15 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
 android {
     namespace = "com.chenfa.openclashinstaller"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.chenfa.openclashinstaller"
@@ -65,9 +72,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     packaging {
