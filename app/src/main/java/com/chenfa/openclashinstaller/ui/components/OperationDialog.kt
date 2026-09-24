@@ -21,7 +21,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -123,13 +122,18 @@ fun OperationDialog(
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        // 日志区（占大部分，保留实体底色保证等宽日志可读性）
+                        // 日志区（占大部分）：液态玻璃面板，半透明底色保留日志可读性
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
-                                .clip(GlassShapes.logPanel)
-                                .background(if (dark) LogBgDark else LogBg),
+                                .glass(
+                                    shape = GlassShapes.logPanel,
+                                    tint = if (dark) LogBgDark.copy(alpha = 0.55f)
+                                    else LogBg.copy(alpha = 0.55f),
+                                    blurRadius = 20.dp,
+                                    shadowRadius = 12.dp,
+                                ),
                         ) {
                             if (entries.isEmpty()) {
                                 Text(

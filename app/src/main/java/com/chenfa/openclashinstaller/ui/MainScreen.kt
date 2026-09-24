@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -27,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -125,16 +127,18 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 )
             },
             bottomBar = {
-                // 悬浮玻璃底栏：避让系统手势导航条
+                // 悬浮玻璃底栏：避让系统手势导航条，居中收窄（宽度 3/4）
                 Box(
                     modifier = Modifier
                         .navigationBarsPadding()
                         .padding(bottom = 6.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     LiquidBottomTabs(
                         selectedTabIndex = { selectedTab.ordinal },
                         onTabSelected = { selectedTab = LiquidTab.entries[it] },
                         tabsCount = LiquidTab.entries.size,
+                        modifier = Modifier.fillMaxWidth(0.75f),
                     ) {
                         LiquidTab.entries.forEach { tab ->
                             val isSelected = tab == selectedTab
