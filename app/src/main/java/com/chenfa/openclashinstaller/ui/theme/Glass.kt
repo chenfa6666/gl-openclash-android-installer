@@ -27,6 +27,7 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.Shadow
@@ -137,6 +138,8 @@ fun Modifier.glass(
             effects = {
                 blur(blurRadiusPx)
                 vibrancy()
+                // 透镜折射：API 33+ 真折射，以下自动 no-op（lens 内部 isRuntimeShaderSupported 守护）
+                lens(10f.dp.toPx(), 10f.dp.toPx())
             },
             highlight = {
                 Highlight(alpha = highlightIntensity)

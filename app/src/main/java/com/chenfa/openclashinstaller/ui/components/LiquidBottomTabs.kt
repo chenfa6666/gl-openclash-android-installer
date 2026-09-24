@@ -140,7 +140,7 @@ fun LiquidBottomTabs(
     BoxWithConstraints(modifier, contentAlignment = Alignment.CenterStart) {
         val density = LocalDensity.current
         val tabWidth = with(density) {
-            (constraints.maxWidth.toFloat() - 8f.dp.toPx()) / tabsCount
+            (constraints.maxWidth.toFloat() - 6f.dp.toPx()) / tabsCount
         }
 
         val offsetAnimation = remember { Animatable(0f) }
@@ -164,7 +164,7 @@ fun LiquidBottomTabs(
                 valueRange = 0f..(tabsCount - 1).toFloat(),
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
-                pressedScale = 78f / 56f,
+                pressedScale = 62f / 44f,
                 onDragStarted = {},
                 onDragStopped = {
                     val targetIndex = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
@@ -224,20 +224,20 @@ fun LiquidBottomTabs(
                     effects = {
                         vibrancy()
                         blur(8f.dp.toPx())
-                        lens(24f.dp.toPx(), 24f.dp.toPx())
+                        lens(18f.dp.toPx(), 18f.dp.toPx())
                     },
                     layerBlock = {
                         val progress = dampedDragAnimation.pressProgress
-                        val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
+                        val scale = lerp(1f, 1f + 12f.dp.toPx() / size.width, progress)
                         scaleX = scale
                         scaleY = scale
                     },
                     onDrawSurface = { drawRect(containerColor) },
                 )
                 .then(interactiveHighlight.modifier)
-                .height(64.dp)
+                .height(52.dp)
                 .fillMaxWidth()
-                .padding(4.dp),
+                .padding(3.dp),
             verticalAlignment = Alignment.CenterVertically,
             content = content,
         )
@@ -262,8 +262,8 @@ fun LiquidBottomTabs(
                             vibrancy()
                             blur(8f.dp.toPx())
                             lens(
-                                24f.dp.toPx() * progress,
-                                24f.dp.toPx() * progress,
+                                18f.dp.toPx() * progress,
+                                18f.dp.toPx() * progress,
                             )
                         },
                         highlight = {
@@ -273,9 +273,9 @@ fun LiquidBottomTabs(
                         onDrawSurface = { drawRect(containerColor) },
                     )
                     .then(interactiveHighlight.modifier)
-                    .height(56.dp)
+                    .height(44.dp)
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
+                    .padding(horizontal = 3.dp)
                     .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
                 verticalAlignment = Alignment.CenterVertically,
                 content = content,
@@ -285,7 +285,7 @@ fun LiquidBottomTabs(
         // ── 滑动凝胶指示器：折射滑块 + 速度形变 + 内阴影 ──
         Box(
             Modifier
-                .padding(horizontal = 4.dp)
+                .padding(horizontal = 3.dp)
                 .graphicsLayer {
                     translationX =
                         if (isLtr) {
@@ -298,12 +298,12 @@ fun LiquidBottomTabs(
                 .then(dampedDragAnimation.modifier)
                 .drawBackdrop(
                     backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
-                    shape = { RoundedCornerShape(28.dp) },
+                    shape = { RoundedCornerShape(22.dp) },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
                         lens(
+                            8f.dp.toPx() * progress,
                             10f.dp.toPx() * progress,
-                            14f.dp.toPx() * progress,
                             chromaticAberration = true,
                         )
                     },
@@ -339,7 +339,7 @@ fun LiquidBottomTabs(
                         drawRect(Color.Black.copy(alpha = 0.03f * progress))
                     },
                 )
-                .height(56.dp)
+                .height(44.dp)
                 .fillMaxWidth(1f / tabsCount),
         )
     }

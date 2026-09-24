@@ -16,7 +16,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * 交互高光：跟随手指位置的白色高光，按下时淡入、松手时淡出。
+ * 交互高光：跟随手指位置的白色径向高光，按下时淡入、松手时淡出。
+ *
+ * 来源：Kyant0/AndroidLiquidGlass catalog。去掉了 RuntimeShader 部分（API 33+ 专属），
+ * 统一使用全幅 drawRect + BlendMode.Plus 的降级路径，在所有 API 级别表现一致。
  */
 class InteractiveHighlight(
     val animationScope: CoroutineScope,

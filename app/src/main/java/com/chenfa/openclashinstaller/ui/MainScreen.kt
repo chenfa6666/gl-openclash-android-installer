@@ -129,7 +129,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 Box(
                     modifier = Modifier
                         .navigationBarsPadding()
-                        .padding(bottom = 10.dp),
+                        .padding(bottom = 6.dp),
                 ) {
                     LiquidBottomTabs(
                         selectedTabIndex = { selectedTab.ordinal },
@@ -144,7 +144,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                                     tab.icon,
                                     contentDescription = tab.label,
                                     tint = color,
-                                    modifier = Modifier.height(22.dp),
+                                    modifier = Modifier.height(20.dp),
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
