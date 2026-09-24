@@ -16,12 +16,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * 阻尼拖拽动画：长按→拖拽→松手 时驱动一个浮点值 + 缩放系数 + 速度。
  *
  * 来源：Kyant0/AndroidLiquidGlass catalog，[awaitFrame] 用 Compose withFrameNanos 替代 KMP expect。
  */
+@OptIn(ExperimentalTime::class)
 class DampedDragAnimation(
     private val animationScope: CoroutineScope,
     val initialValue: Float,
