@@ -130,6 +130,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 // 悬浮玻璃底栏：避让系统手势导航条，居中收窄（宽度 3/4）
                 Box(
                     modifier = Modifier
+                        .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(bottom = 6.dp),
                     contentAlignment = Alignment.Center,
