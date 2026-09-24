@@ -10,7 +10,7 @@ jsch = "0.2.16"
 okhttp = "4.12.0"
 datastore = "1.1.1"
 # Android Liquid Glass（io.github.kyant0:backdrop）：backdrop 模糊/液态玻璃效果原语
-backdrop = "1.0.0"
+backdrop = "2.0.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -28,7 +28,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 jsch-mwiede = { module = "com.github.mwiede:jsch", version.ref = "jsch" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
-backdrop = { module = "io.github.kyant0:backdrop", version.ref = "backdrop" }
+backdrop = { module = "io.github.kyant0:backdrop-android", version.ref = "backdrop" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

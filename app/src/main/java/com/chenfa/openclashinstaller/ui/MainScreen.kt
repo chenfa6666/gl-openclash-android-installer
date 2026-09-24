@@ -43,6 +43,7 @@ import com.chenfa.openclashinstaller.ui.components.LiquidTab
 import com.chenfa.openclashinstaller.ui.components.OperationDialog
 import com.chenfa.openclashinstaller.ui.theme.GlassShapes
 import com.chenfa.openclashinstaller.ui.theme.LiquidGlassRoot
+import com.chenfa.openclashinstaller.ui.theme.LocalBackdrop
 import com.chenfa.openclashinstaller.ui.theme.LocalGlassTokens
 import com.chenfa.openclashinstaller.ui.theme.glass
 
@@ -132,6 +133,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                         .padding(bottom = 10.dp),
                 ) {
                     LiquidBottomTabs(
+                        backdrop = LocalBackdrop.current,
                         selectedTabIndex = { selectedTab.ordinal },
                         onTabSelected = { selectedTab = LiquidTab.entries[it] },
                         tabsCount = LiquidTab.entries.size,
