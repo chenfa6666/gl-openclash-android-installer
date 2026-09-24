@@ -152,23 +152,26 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                 }
             },
             ) { padding ->
-                // 底栏改为悬浮覆盖层，不再占 Scaffold 布局；内容自行避让底栏高度
-                val pagePadding = padding + PaddingValues(bottom = 64.dp)
-                Crossfade(targetState = selectedTab, label = "pageSwitch") { tab ->
+                // 底栏改为悬浮覆盖层，不再占 Scaffold 布局；内容底部避让底栏高度
+                Crossfade(
+                    targetState = selectedTab,
+                    label = "pageSwitch",
+                    modifier = Modifier.padding(bottom = 64.dp),
+                ) { tab ->
                     when (tab) {
                         LiquidTab.INSTALL -> InstallPage(
                             vm = vm,
-                            contentPadding = pagePadding,
+                            contentPadding = padding,
                             onEditConnection = { selectedTab = LiquidTab.SETTINGS },
                         )
 
                         LiquidTab.SETTINGS -> SettingsPage(
                             vm = vm,
-                            contentPadding = pagePadding,
+                            contentPadding = padding,
                             onSaved = { selectedTab = LiquidTab.INSTALL },
                         )
 
-                        LiquidTab.ABOUT -> AboutPage(contentPadding = pagePadding)
+                        LiquidTab.ABOUT -> AboutPage(contentPadding = padding)
                     }
                 }
             }
