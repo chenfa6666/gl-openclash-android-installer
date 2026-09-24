@@ -10,20 +10,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.util.fastCoerceIn
-import com.kyant.backdrop.RuntimeShader
-import com.kyant.backdrop.asComposeShader
-import com.kyant.backdrop.isRuntimeShaderSupported
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * 交互高光：跟随手指位置的白色径向高光，按下时淡入、松手时淡出。
- *
- * 来源：Kyant0/AndroidLiquidGlass catalog。API 33+ 使用 RuntimeShader 做径向渐变高光，
- * 低版本降级为全幅 drawRect + BlendMode.Plus。
+ * 交互高光：跟随手指位置的白色高光，按下时淡入、松手时淡出。
  */
 class InteractiveHighlight(
     val animationScope: CoroutineScope,
@@ -41,53 +34,13 @@ class InteractiveHighlight(
     val pressProgress: Float get() = pressProgressAnimation.value
     val offset: Offset get() = positionAnimation.value - startPosition
 
-    private val shader =
-        if (isRuntimeShaderSupported()) {
-            RuntimeShader(
-                """
-uniform float2 size;
-layout(color) uniform half4 color;
-uniform float radius;
-uniform float2 position;
-half4 main(float2 coord) {
-    float dist = distance(coord, position);
-    float intensity = smoothstep(radius, radius * 0.5, dist);
-    return color * intensity;
-}""",
-            )
-        } else {
-            null
-        }
-
     val modifier: Modifier = Modifier.drawWithContent {
         val progress = pressProgressAnimation.value
         if (progress > 0f) {
-            if (shader != null) {
-                drawRect(
-                    Color.White.copy(0.08f * progress),
-                    blendMode = BlendMode.Plus,
-                )
-                shader.apply {
-                    val pos = position(size, positionAnimation.value)
-                    setFloatUniform("size", size.width, size.height)
-                    setColorUniform("color", Color.White.copy(0.15f * progress))
-                    setFloatUniform("radius", size.minDimension * 1.5f)
-                    setFloatUniform(
-                        "position",
-                        pos.x.fastCoerceIn(0f, size.width),
-                        pos.y.fastCoerceIn(0f, size.height),
-                    )
-                }
-                drawRect(
-                    ShaderBrush(shader.asComposeShader()),
-                    blendMode = BlendMode.Plus,
-                )
-            } else {
-                drawRect(
-                    Color.White.copy(0.25f * progress),
-                    blendMode = BlendMode.Plus,
-                )
-            }
+            drawRect(
+                Color.White.copy(0.25f * progress),
+                blendMode = BlendMode.Plus,
+            )
         }
         drawContent()
     }

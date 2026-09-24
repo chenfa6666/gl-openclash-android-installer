@@ -89,12 +89,6 @@ android {
     }
 }
 
-// backdrop 2.0.x AAR 元数据要求 compileSdk 37，但 AGP 8.7.3 最高支持 35；
-// 库内部已做 API 级别降级，跳过元数据检查即可编译运行
-tasks.matching { it.name.contains("AarMetadata") }.configureEach {
-    enabled = false
-}
-
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
