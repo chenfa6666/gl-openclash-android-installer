@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -82,9 +83,10 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
 
     // 玻璃根：液态壁纸采样层 + 前景 UI
     LiquidGlassRoot {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                containerColor = Color.Transparent,
+                topBar = {
                 TopAppBar(
                     title = {
                         Text(
@@ -126,44 +128,14 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     ),
                 )
             },
-            bottomBar = {
-                // 悬浮玻璃底栏：避让系统手势导航条，居中收窄（宽度 3/4）
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(bottom = 6.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LiquidBottomTabs(
-                        selectedTabIndex = { selectedTab.ordinal },
-                        onTabSelected = { selectedTab = LiquidTab.entries[it] },
-                        tabsCount = LiquidTab.entries.size,
-                        modifier = Modifier.fillMaxWidth(0.75f),
-                    ) {
-                        LiquidTab.entries.forEach { tab ->
-                            val isSelected = tab == selectedTab
-                            val color = if (isSelected) tokens.primary else tokens.onGlassEmphasis
-                            LiquidBottomTab(onClick = { selectedTab = tab }) {
-                                Icon(
-                                    tab.icon,
-                                    contentDescription = tab.label,
-                                    tint = color,
-                                    modifier = Modifier.height(20.dp),
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    tab.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = color,
-                                )
-                            }
-                        }
-                    }
-                }
-            },
             snackbarHost = {
-                SnackbarHost(hostState = snackbarHost) { data ->
+                // 避让悬浮底栏，显示在其上方
+                SnackbarHost(
+                    hostState = snackbarHost,
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = 64.dp),
+                ) { data ->
                     GlassSurface(
                         shape = GlassShapes.snack,
                         tint = tokens.snack,
@@ -179,22 +151,61 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     }
                 }
             },
-        ) { padding ->
-            Crossfade(targetState = selectedTab, label = "pageSwitch") { tab ->
-                when (tab) {
-                    LiquidTab.INSTALL -> InstallPage(
-                        vm = vm,
-                        contentPadding = padding,
-                        onEditConnection = { selectedTab = LiquidTab.SETTINGS },
-                    )
+            ) { padding ->
+                // 底栏改为悬浮覆盖层，不再占 Scaffold 布局；内容自行避让底栏高度
+                val pagePadding = padding + PaddingValues(bottom = 64.dp)
+                Crossfade(targetState = selectedTab, label = "pageSwitch") { tab ->
+                    when (tab) {
+                        LiquidTab.INSTALL -> InstallPage(
+                            vm = vm,
+                            contentPadding = pagePadding,
+                            onEditConnection = { selectedTab = LiquidTab.SETTINGS },
+                        )
 
-                    LiquidTab.SETTINGS -> SettingsPage(
-                        vm = vm,
-                        contentPadding = padding,
-                        onSaved = { selectedTab = LiquidTab.INSTALL },
-                    )
+                        LiquidTab.SETTINGS -> SettingsPage(
+                            vm = vm,
+                            contentPadding = pagePadding,
+                            onSaved = { selectedTab = LiquidTab.INSTALL },
+                        )
 
-                    LiquidTab.ABOUT -> AboutPage(contentPadding = padding)
+                        LiquidTab.ABOUT -> AboutPage(contentPadding = pagePadding)
+                    }
+                }
+            }
+
+            // 悬浮液态玻璃底栏：覆盖在页面内容之上，避让系统手势导航条，居中收窄（宽度 3/4）
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                LiquidBottomTabs(
+                    selectedTabIndex = { selectedTab.ordinal },
+                    onTabSelected = { selectedTab = LiquidTab.entries[it] },
+                    tabsCount = LiquidTab.entries.size,
+                    modifier = Modifier.fillMaxWidth(0.75f),
+                ) {
+                    LiquidTab.entries.forEach { tab ->
+                        val isSelected = tab == selectedTab
+                        val color = if (isSelected) tokens.primary else tokens.onGlassEmphasis
+                        LiquidBottomTab(onClick = { selectedTab = tab }) {
+                            Icon(
+                                tab.icon,
+                                contentDescription = tab.label,
+                                tint = color,
+                                modifier = Modifier.height(20.dp),
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                tab.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = color,
+                            )
+                        }
+                    }
                 }
             }
         }

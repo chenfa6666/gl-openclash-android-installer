@@ -76,7 +76,7 @@ fun AboutPage(contentPadding: PaddingValues) {
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            .padding(horizontal = 12.dp)
+            .padding(start = 12.dp, end = 12.dp, top = 12.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
