@@ -73,6 +73,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // jsch 与 backdrop 传递依赖 jspecify 都带此 OSGI 清单，合并冲突，与运行无关
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
         jniLibs {
             excludes += "**/libdatastore_shared_counter.so"
