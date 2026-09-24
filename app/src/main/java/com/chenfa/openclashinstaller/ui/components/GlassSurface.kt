@@ -2,22 +2,22 @@ package com.chenfa.openclashinstaller.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.chenfa.openclashinstaller.ui.theme.GlassShapes
@@ -31,7 +31,7 @@ import com.chenfa.openclashinstaller.ui.theme.glass
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
-    shape: Shape = GlassShapes.card,
+    shape: androidx.compose.ui.graphics.Shape = GlassShapes.card,
     tint: Color? = null,
     contentColor: Color? = null,
     blurRadius: Dp = 24.dp,
@@ -64,13 +64,17 @@ fun GlassSurface(
 /**
  * 可点击玻璃面（玻璃按钮 / 整块可点卡片用）：
  * 按下时有轻微回弹缩放 + 叠色加深，禁用时整体变淡；不改变任何业务回调。
+ *
+ * 不用 Material Surface(onClick)：其内部是带 SpaceBetween 的 Row，
+ * 固定高度按钮里文字会出现垂直方向偏移；这里用自控 Box + clickable，
+ * 内容严格按调用方给定的对齐方式居中。
  */
 @Composable
 fun GlassSurface(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = GlassShapes.card,
+    shape: androidx.compose.ui.graphics.Shape = GlassShapes.card,
     tint: Color,
     contentColor: Color,
     blurRadius: Dp = 24.dp,
@@ -90,9 +94,7 @@ fun GlassSurface(
         pressed -> 0.88f
         else -> 1f
     }
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
+    Box(
         modifier = modifier
             .graphicsLayer {
                 scaleX = scale
@@ -103,19 +105,23 @@ fun GlassSurface(
                 tint = tint.copy(alpha = tint.alpha * alphaMultiplier),
                 blurRadius = blurRadius,
                 shadowRadius = if (enabled) 10.dp else 6.dp,
+            )
+            .clip(shape)
+            .clickable(
+                interactionSource = source,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
             ),
-        shape = shape,
-        color = Color.Transparent,
-        contentColor = if (enabled) contentColor else contentColor.copy(alpha = 0.38f),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        interactionSource = source,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding),
-            content = content,
-        )
+        CompositionLocalProvider(
+            LocalContentColor provides if (enabled) contentColor else contentColor.copy(alpha = 0.38f),
+        ) {
+            Box(
+                modifier = Modifier.padding(contentPadding),
+                content = content,
+            )
+        }
     }
 }
