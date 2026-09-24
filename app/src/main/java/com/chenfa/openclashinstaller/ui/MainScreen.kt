@@ -33,9 +33,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.chenfa.openclashinstaller.data.model.UiEvent
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import com.chenfa.openclashinstaller.ui.components.ConfirmAbortDialog
 import com.chenfa.openclashinstaller.ui.components.GlassSurface
-import com.chenfa.openclashinstaller.ui.components.LiquidBottomBar
+import com.chenfa.openclashinstaller.ui.components.LiquidBottomTab
+import com.chenfa.openclashinstaller.ui.components.LiquidBottomTabs
 import com.chenfa.openclashinstaller.ui.components.LiquidTab
 import com.chenfa.openclashinstaller.ui.components.OperationDialog
 import com.chenfa.openclashinstaller.ui.theme.GlassShapes
@@ -128,10 +131,30 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                         .navigationBarsPadding()
                         .padding(bottom = 10.dp),
                 ) {
-                    LiquidBottomBar(
-                        selected = selectedTab,
-                        onSelect = { selectedTab = it },
-                    )
+                    LiquidBottomTabs(
+                        selectedTabIndex = { selectedTab.ordinal },
+                        onTabSelected = { selectedTab = LiquidTab.entries[it] },
+                        tabsCount = LiquidTab.entries.size,
+                    ) {
+                        LiquidTab.entries.forEach { tab ->
+                            val isSelected = tab == selectedTab
+                            val color = if (isSelected) tokens.onPrimary else tokens.onGlassEmphasis
+                            LiquidBottomTab(onClick = { selectedTab = tab }) {
+                                Icon(
+                                    tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = color,
+                                    modifier = Modifier.height(22.dp),
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    tab.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = color,
+                                )
+                            }
+                        }
+                    }
                 }
             },
             snackbarHost = {
