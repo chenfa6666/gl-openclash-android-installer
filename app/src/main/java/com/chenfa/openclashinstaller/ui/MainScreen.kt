@@ -138,7 +138,7 @@ fun MainScreen(vm: MainViewModel = viewModel(factory = MainViewModelFactory)) {
                     ) {
                         LiquidTab.entries.forEach { tab ->
                             val isSelected = tab == selectedTab
-                            val color = if (isSelected) tokens.onPrimary else tokens.onGlassEmphasis
+                            val color = if (isSelected) tokens.primary else tokens.onGlassEmphasis
                             LiquidBottomTab(onClick = { selectedTab = tab }) {
                                 Icon(
                                     tab.icon,

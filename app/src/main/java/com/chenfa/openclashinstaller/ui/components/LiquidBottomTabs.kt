@@ -33,20 +33,35 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
+import com.chenfa.openclashinstaller.ui.theme.LocalBackdrop
+import com.chenfa.openclashinstaller.ui.theme.LocalDarkTheme
 import com.chenfa.openclashinstaller.ui.theme.LocalGlassTokens
-import com.chenfa.openclashinstaller.ui.theme.glass
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
+import com.kyant.backdrop.shadow.Shadow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -62,6 +77,9 @@ enum class LiquidTab(val label: String, val icon: ImageVector) {
 
 internal val LocalLiquidBottomTabScale = staticCompositionLocalOf { { 1f } }
 
+/**
+ * 单个 tab 项：图标 + 文字，点击切换。长按拖拽由 [LiquidBottomTabs] 的滑块处理。
+ */
 @Composable
 fun RowScope.LiquidBottomTab(
     onClick: () -> Unit,
@@ -94,11 +112,13 @@ fun RowScope.LiquidBottomTab(
 /**
  * 悬浮液态玻璃底栏（长按拖拽水波动画版）。
  *
- * 适配 backdrop 1.0.0 API，使用 Modifier.glass() + graphicsLayer 实现：
- * - 选中滑块可长按拖拽在 tab 间滑动，松手弹簧吸附到最近的 tab
- * - 滑块按压时放大、拖拽时根据速度做挤压形变
- * - 底栏本体在按压时整体微胀
- * - 触摸位置有高光跟随
+ * 逐行移植自 Kyant0/AndroidLiquidGlass catalog 的 LiquidBottomTabs（backdrop 2.0.1）：
+ * - 底栏本体：drawBackdrop + vibrancy + blur + lens，按压时整体微胀；
+ * - 隐藏折射源层（alpha=0 + layerBackdrop）：把 tab 内容以品牌色着色后录进
+ *   tabsBackdrop，供滑块做折射采样（水感来源）；
+ * - 滑块：rememberCombinedBackdrop(根层, tabsBackdrop) + 色差 lens +
+ *   速度挤压形变 + InnerShadow/Shadow/Highlight 随按压进度淡入；
+ * - 长按拖拽可在 tab 间滑动，松手弹簧吸附最近 tab。
  */
 @Composable
 fun LiquidBottomTabs(
@@ -108,10 +128,14 @@ fun LiquidBottomTabs(
     tabsCount: Int = 3,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val backdrop = LocalBackdrop.current
     val tokens = LocalGlassTokens.current
-    val barShape = RoundedCornerShape(30.dp)
+    val isLightTheme = !LocalDarkTheme.current
     val accentColor = tokens.primary
     val containerColor = tokens.bar
+    val barShape = RoundedCornerShape(50)
+
+    val tabsBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.CenterStart) {
         val density = LocalDensity.current
@@ -190,7 +214,35 @@ fun LiquidBottomTabs(
             )
         }
 
-        // ── 底栏本体（玻璃胶囊 + tab 内容 + 按压微胀） ──
+        // ── 底栏本体：玻璃胶囊 + lens 折射 + 按压微胀 ──
+        Row(
+            Modifier
+                .graphicsLayer { translationX = panelOffset }
+                .drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { barShape },
+                    effects = {
+                        vibrancy()
+                        blur(8f.dp.toPx())
+                        lens(24f.dp.toPx(), 24f.dp.toPx())
+                    },
+                    layerBlock = {
+                        val progress = dampedDragAnimation.pressProgress
+                        val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
+                        scaleX = scale
+                        scaleY = scale
+                    },
+                    onDrawSurface = { drawRect(containerColor) },
+                )
+                .then(interactiveHighlight.modifier)
+                .height(64.dp)
+                .fillMaxWidth()
+                .padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+
+        // ── 隐藏折射源层：把 tab 内容以品牌色着色录进 tabsBackdrop ──
         CompositionLocalProvider(
             LocalLiquidBottomTabScale provides {
                 lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
@@ -198,24 +250,39 @@ fun LiquidBottomTabs(
         ) {
             Row(
                 Modifier
+                    .clearAndSetSemantics {}
+                    .alpha(0f)
+                    .layerBackdrop(tabsBackdrop)
                     .graphicsLayer { translationX = panelOffset }
-                    .glass(barShape, containerColor, 22.dp, 18.dp)
-                    .graphicsLayer {
-                        val progress = dampedDragAnimation.pressProgress
-                        val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
-                        scaleX = scale
-                        scaleY = scale
-                    }
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { barShape },
+                        effects = {
+                            val progress = dampedDragAnimation.pressProgress
+                            vibrancy()
+                            blur(8f.dp.toPx())
+                            lens(
+                                24f.dp.toPx() * progress,
+                                24f.dp.toPx() * progress,
+                            )
+                        },
+                        highlight = {
+                            val progress = dampedDragAnimation.pressProgress
+                            Highlight.Default.copy(alpha = progress)
+                        },
+                        onDrawSurface = { drawRect(containerColor) },
+                    )
                     .then(interactiveHighlight.modifier)
-                    .height(64.dp)
+                    .height(56.dp)
                     .fillMaxWidth()
-                    .padding(4.dp),
+                    .padding(horizontal = 4.dp)
+                    .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
                 verticalAlignment = Alignment.CenterVertically,
                 content = content,
             )
         }
 
-        // ── 滑动凝胶指示器（品牌色胶囊 + 拖拽 + 速度形变） ──
+        // ── 滑动凝胶指示器：折射滑块 + 速度形变 + 内阴影 ──
         Box(
             Modifier
                 .padding(horizontal = 4.dp)
@@ -229,14 +296,49 @@ fun LiquidBottomTabs(
                 }
                 .then(interactiveHighlight.gestureModifier)
                 .then(dampedDragAnimation.modifier)
-                .glass(RoundedCornerShape(22.dp), accentColor, 18.dp, 12.dp)
-                .graphicsLayer {
-                    scaleX = dampedDragAnimation.scaleX
-                    scaleY = dampedDragAnimation.scaleY
-                    val velocity = dampedDragAnimation.velocity / 10f
-                    scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
-                    scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
-                }
+                .drawBackdrop(
+                    backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
+                    shape = { RoundedCornerShape(28.dp) },
+                    effects = {
+                        val progress = dampedDragAnimation.pressProgress
+                        lens(
+                            10f.dp.toPx() * progress,
+                            14f.dp.toPx() * progress,
+                            chromaticAberration = true,
+                        )
+                    },
+                    highlight = {
+                        val progress = dampedDragAnimation.pressProgress
+                        Highlight.Default.copy(alpha = progress)
+                    },
+                    shadow = {
+                        val progress = dampedDragAnimation.pressProgress
+                        Shadow(alpha = progress)
+                    },
+                    innerShadow = {
+                        val progress = dampedDragAnimation.pressProgress
+                        InnerShadow(
+                            radius = 8.dp * progress,
+                            alpha = progress,
+                        )
+                    },
+                    layerBlock = {
+                        scaleX = dampedDragAnimation.scaleX
+                        scaleY = dampedDragAnimation.scaleY
+                        val velocity = dampedDragAnimation.velocity / 10f
+                        scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
+                        scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                    },
+                    onDrawSurface = {
+                        val progress = dampedDragAnimation.pressProgress
+                        drawRect(
+                            if (isLightTheme) Color.Black.copy(0.1f)
+                            else Color.White.copy(0.1f),
+                            alpha = 1f - progress,
+                        )
+                        drawRect(Color.Black.copy(alpha = 0.03f * progress))
+                    },
+                )
                 .height(56.dp)
                 .fillMaxWidth(1f / tabsCount),
         )
