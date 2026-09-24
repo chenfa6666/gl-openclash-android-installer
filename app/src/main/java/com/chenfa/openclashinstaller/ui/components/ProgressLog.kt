@@ -1,7 +1,6 @@
 package com.chenfa.openclashinstaller.ui.components
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.chenfa.openclashinstaller.data.model.LogEntry
+import com.chenfa.openclashinstaller.ui.theme.LocalDarkTheme
 
 /**
  * 右侧日志列表：LazyColumn + items(key=id) + animateContentSize。
@@ -29,7 +29,7 @@ fun ProgressLog(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalDarkTheme.current
 
     // 自动滚到底部：当 entries 数量变化或最后一条 text 变化时
     LaunchedEffect(entries.size, entries.lastOrNull()?.text) {
