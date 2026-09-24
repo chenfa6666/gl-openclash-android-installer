@@ -13,7 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.chenfa.openclashinstaller.data.model.EnvItem
 import com.chenfa.openclashinstaller.ui.theme.EnvNoColor
+import com.chenfa.openclashinstaller.ui.theme.EnvNoColorDark
 import com.chenfa.openclashinstaller.ui.theme.EnvOkColor
+import com.chenfa.openclashinstaller.ui.theme.EnvOkColorDark
+import com.chenfa.openclashinstaller.ui.theme.LocalDarkTheme
+import com.chenfa.openclashinstaller.ui.theme.LocalGlassTokens
 
 /**
  * 单行环境检查：name + 绿 yes / 红 no。
@@ -21,6 +25,8 @@ import com.chenfa.openclashinstaller.ui.theme.EnvOkColor
  */
 @Composable
 fun EnvCheckRow(item: EnvItem, modifier: Modifier = Modifier) {
+    val dark = LocalDarkTheme.current
+    val tokens = LocalGlassTokens.current
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -30,13 +36,19 @@ fun EnvCheckRow(item: EnvItem, modifier: Modifier = Modifier) {
         Text(
             text = item.name,
             style = MaterialTheme.typography.bodyLarge,
+            color = tokens.onGlass,
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = if (item.ok) "yes" else "no",
             style = MaterialTheme.typography.bodyLarge,
-            color = if (item.ok) EnvOkColor else EnvNoColor,
+            color = when {
+                item.ok && dark -> EnvOkColorDark
+                item.ok -> EnvOkColor
+                dark -> EnvNoColorDark
+                else -> EnvNoColor
+            },
         )
     }
 }

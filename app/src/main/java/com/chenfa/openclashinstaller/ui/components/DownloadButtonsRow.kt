@@ -6,16 +6,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.chenfa.openclashinstaller.ui.theme.LocalGlassTokens
 
 /**
- * 「内核」「openclash」并排按钮（都填充主色，视觉对称）。
+ * 「内核」「openclash」并排蓝色凝胶玻璃按钮（视觉对称）。
  */
 @Composable
 fun DownloadButtonsRow(
@@ -24,18 +21,30 @@ fun DownloadButtonsRow(
     enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Button(
+    val tokens = LocalGlassTokens.current
+    Row(modifier = modifier
+        .fillMaxWidth()
+        .padding(vertical = 4.dp)) {
+        GelGlassButton(
+            text = "内核",
             onClick = onKernel,
             enabled = enabled,
-            modifier = Modifier.weight(1f).height(48.dp),
-        ) { Text("内核", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            tint = tokens.primary,
+            contentColor = tokens.onPrimary,
+        )
         Spacer(Modifier.width(8.dp))
-        Button(
+        GelGlassButton(
+            text = "OpenClash",
             onClick = onOpenclash,
             enabled = enabled,
-            modifier = Modifier.weight(1f).height(48.dp),
-        ) { Text("OpenClash", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            tint = tokens.primary,
+            contentColor = tokens.onPrimary,
+        )
     }
 }
-

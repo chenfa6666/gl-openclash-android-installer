@@ -3,16 +3,17 @@ import java.io.File
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.chenfa.openclashinstaller"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.chenfa.openclashinstaller"
         minSdk = 28
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 2
         versionName = "1.0.0"
     }
@@ -60,9 +61,6 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -96,5 +94,6 @@ dependencies {
     implementation(libs.jsch.mwiede)
     implementation(libs.okhttp)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.backdrop)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
