@@ -9,7 +9,7 @@ object Constants {
     const val DEF_URL_KERNEL =
         "https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-arm64.tar.gz"
     const val DEF_URL_OPENCLASH =
-        "https://raw.githubusercontent.com/vernesong/OpenClash/package/master/luci-app-openclash_0.47.156_all.ipk"
+        "https://raw.githubusercontent.com/vernesong/OpenClash/package/master/luci-app-openclash_0.48.002_all.ipk"
     const val DEF_URL_FAN =
         "https://github.com/XIAOZHAOXSXH/gl-fanctrl/releases/download/v0.1.3/gl-fanctrl_0.1.3_all.ipk"
 
