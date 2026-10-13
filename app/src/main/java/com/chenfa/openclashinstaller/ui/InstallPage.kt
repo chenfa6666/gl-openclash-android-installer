@@ -66,7 +66,7 @@ fun InstallPage(
                 enabled = !state.busy,
             )
             Text(
-                "·下载走网络；顶栏 ↓ 按钮手动从手机导入 ipk / gz",
+                "下载走网络；顶栏 ↓ 本地导入 ipk / gz",
                 style = MaterialTheme.typography.bodySmall,
                 color = tokens.onGlassEmphasis,
                 modifier = Modifier.padding(top = 2.dp),
@@ -109,12 +109,12 @@ fun InstallPage(
 
         // 操作按钮列表
         PrimaryButton(
-            text = "连接测试",
+            text = "路由器连接测试",
             onClick = vm::testConn,
             enabled = !state.busy,
         )
         PrimaryButton(
-            text = "开始安装",
+            text = "开始安装OpenClash",
             onClick = vm::install,
             enabled = !state.busy,
         )
@@ -136,7 +136,7 @@ fun InstallPage(
             onClick = vm::unlockHidden,
             enabled = !state.busy,
             variant = PrimaryButtonVariant.TONAL,
-            subtitle = "将 GL 管理界面中被 lang_hide 隐藏的菜单项改为中文可见",
+            subtitle = "解锁 GL 管理界面隐藏的菜单项",
         )
 
         Text(
@@ -150,7 +150,7 @@ fun InstallPage(
             onClick = vm::fixUsbTethering,
             enabled = !state.busy,
             variant = PrimaryButtonVariant.TONAL,
-            subtitle = "内置修复版 RNDIS 内核模块，修复完成手动重启路由器生效",
+            subtitle = "修复完成手动重启路由器生效",
         )
 
         Spacer(Modifier.height(20.dp))
