@@ -1,166 +1,266 @@
 package com.chenfa.openclashinstaller.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.chenfa.openclashinstaller.BuildConfig
-import com.chenfa.openclashinstaller.ui.components.GlassSurface
-import com.chenfa.openclashinstaller.ui.theme.GlassShapes
-import com.chenfa.openclashinstaller.ui.theme.LocalGlassTokens
+import com.chenfa.openclashinstaller.R
+import com.chenfa.openclashinstaller.ui.components.BlurredBar
+import com.chenfa.openclashinstaller.ui.components.rememberBlurBackdrop
+import com.chenfa.openclashinstaller.ui.theme.LocalEnableBlur
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
-/**
- * 「关于」页：应用信息 + 开源致谢。
- *
- * 卡片之间用统一的 spacedBy 间距，避免空隙不一致；致谢卡片列出本项目用到的
- * GitHub 开源项目并致谢，点击可跳转对应仓库。
- */
-
-/** 一个开源项目条目：名称 + 说明 + 仓库地址。 */
-private data class Credit(val name: String, val desc: String, val url: String)
+private data class Credit(
+    val name: String,
+    val description: String,
+    val url: String,
+)
 
 private val credits = listOf(
     Credit(
-        name = "AndroidLiquidGlass (backdrop)",
-        desc = "液态玻璃 / 背景模糊效果原语",
-        url = "https://github.com/Kyant0/AndroidLiquidGlass",
+        name = "KernelSU",
+        description = "本次界面的视觉与 Miuix 结构参考",
+        url = "https://github.com/tiann/KernelSU",
+    ),
+    Credit(
+        name = "Miuix KMP",
+        description = "HyperOS 风格 Compose Multiplatform 组件库",
+        url = "https://github.com/compose-miuix-ui/miuix",
     ),
     Credit(
         name = "Jetpack Compose",
-        desc = "现代声明式 UI 框架",
+        description = "现代声明式 Android UI 框架",
         url = "https://github.com/androidx/androidx",
     ),
     Credit(
         name = "JSch (mwiede)",
-        desc = "SSH 连接，用于与路由器通信",
+        description = "SSH / SCP 连接与命令执行",
         url = "https://github.com/mwiede/jsch",
     ),
     Credit(
         name = "OkHttp",
-        desc = "HTTP 客户端，用于下载文件",
+        description = "安装包与内核下载",
         url = "https://github.com/square/okhttp",
     ),
     Credit(
         name = "Kotlin Coroutines",
-        desc = "协程，异步任务调度",
+        description = "异步任务调度与取消传播",
         url = "https://github.com/Kotlin/kotlinx.coroutines",
-    ),
-    Credit(
-        name = "AndroidX DataStore",
-        desc = "数据持久化，保存设置",
-        url = "https://developer.android.com/topic/libraries/architecture/datastore",
     ),
 )
 
 @Composable
-fun AboutPage(contentPadding: PaddingValues) {
-    val tokens = LocalGlassTokens.current
-    val uriHandler = LocalUriHandler.current
+fun AboutPage(
+    bottomPadding: Dp,
+    onBack: (() -> Unit)? = null,
+) {
+    val scrollBehavior = MiuixScrollBehavior()
+    val backdrop = rememberBlurBackdrop(LocalEnableBlur.current)
+    val barColor = if (backdrop != null) Color.Transparent else colorScheme.surface
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val open: (String) -> Unit = { url -> runCatching { uriHandler.openUri(url) } }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-            .padding(start = 12.dp, end = 12.dp, top = 12.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // 应用信息
-        GlassSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = GlassShapes.card,
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    "OpenClash 安装器",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = tokens.onGlass,
-                )
-                Text(
-                    "版本: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = tokens.onGlass,
-                )
-                Text(
-                    "作者: chenfa6666",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = tokens.onGlass,
-                )
-                Text(
-                    "github: https://github.com/chenfa6666/gl-openclash-android-installer",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tokens.onGlassEmphasis,
+    Scaffold(
+        topBar = {
+            BlurredBar(backdrop = backdrop) {
+                TopAppBar(
+                    color = barColor,
+                    title = "关于",
+                    navigationIcon = {
+                        if (onBack != null) {
+                            IconButton(
+                                onClick = onBack,
+                                minWidth = 48.dp,
+                                minHeight = 48.dp,
+                            ) {
+                                Icon(
+                                    imageVector = MiuixIcons.Back,
+                                    contentDescription = "返回设置",
+                                    tint = colorScheme.onBackground,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
                 )
             }
-        }
-
-        // 开源致谢
-        GlassSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = GlassShapes.card,
+        },
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars.add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+    ) { innerPadding ->
+        Box(
+            modifier = if (backdrop != null) {
+                Modifier.layerBackdrop(backdrop)
+            } else {
+                Modifier
+            },
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    "开源致谢",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = tokens.onGlass,
-                )
-                Text(
-                    "本应用基于以下开源项目构建，衷心感谢各项目贡献者：",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tokens.onGlassEmphasis,
-                )
-                credits.forEach { credit ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { runCatching { uriHandler.openUri(credit.url) } }
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxHeight()
+                .scrollEndHaptic()
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .padding(horizontal = 12.dp),
+            contentPadding = innerPadding,
+            overscrollEffect = null,
+        ) {
+            item {
+                Column(
+                    modifier = Modifier.padding(top = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                credit.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = tokens.onGlass,
+                        Box(
+                            modifier = Modifier
+                                .size(88.dp)
+                                .background(colorScheme.primary, RoundedCornerShape(24.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_launcher_foreground),
+                                contentDescription = null,
+                                colorFilter = ColorFilter.tint(Color.White),
+                                modifier = Modifier.size(62.dp),
                             )
-                            Text(
-                                credit.desc,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = tokens.onGlassEmphasis,
+                        }
+                        Text(
+                            text = "OpenClash 安装器",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colorScheme.onBackground,
+                            modifier = Modifier.padding(top = 14.dp),
+                        )
+                        Text(
+                            text = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                            fontSize = 14.sp,
+                            color = colorScheme.onSurfaceVariantSummary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        Text(
+                            text = "作者 chenfa6666",
+                            fontSize = 14.sp,
+                            color = colorScheme.onSurfaceVariantSummary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        ArrowPreference(
+                            title = "项目主页",
+                            summary = "github.com/chenfa6666/gl-openclash-android-installer",
+                            onClick = { open("https://github.com/chenfa6666/gl-openclash-android-installer") },
+                        )
+                        ArrowPreference(
+                            title = "支持开发",
+                            summary = "给项目点一个 Star",
+                            onClick = { open("https://github.com/chenfa6666/gl-openclash-android-installer") },
+                        )
+                    }
+
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        credits.forEach { credit ->
+                            ArrowPreference(
+                                title = credit.name,
+                                summary = credit.description,
+                                onClick = { open(credit.url) },
                             )
                         }
                     }
+
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = "使用须知",
+                                fontSize = MiuixTheme.textStyles.headline1.fontSize,
+                                fontWeight = FontWeight.Medium,
+                                color = colorScheme.onSurface,
+                            )
+                            Note("请仅在自己拥有或已获授权的路由器上使用本工具。")
+                            Note("安装前建议备份路由器配置，安装完成后在「服务 → OpenClash」中启用。")
+                            Note("风扇控制与 USB 共享网络修复安装完成后，需要重启路由器生效。")
+                            Note("路由器密码仅保存在本机 DataStore，不会上传到任何服务器。")
+                            Note("本应用与 GL.iNet、OpenClash 官方无隶属关系，使用风险由使用者自行承担。")
+                        }
+                    }
+
+                    Spacer(Modifier.height(bottomPadding + 12.dp))
                 }
-                Text(
-                    "感谢以上所有开源项目的贡献者。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tokens.onGlassEmphasis,
-                )
             }
         }
+    }
+    }
+}
 
-        Spacer(Modifier.height(8.dp))
+@Composable
+private fun Note(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = "·",
+            fontSize = 14.sp,
+            color = colorScheme.primary,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.weight(1f),
+        )
     }
 }

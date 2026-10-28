@@ -2,8 +2,10 @@ package com.chenfa.openclashinstaller.domain
 
 import android.content.Context
 import com.chenfa.openclashinstaller.core.Constants
-import com.chenfa.openclashinstaller.core.ext.ensureActiveOrCancel
 import com.chenfa.openclashinstaller.core.ext.containsCi
+import com.chenfa.openclashinstaller.core.ext.ensureActiveOrCancel
+import com.chenfa.openclashinstaller.core.ext.formatBytes
+import com.chenfa.openclashinstaller.core.ext.toUserMessage
 import com.chenfa.openclashinstaller.data.model.ConnFields
 import com.chenfa.openclashinstaller.data.repo.SshClient
 import kotlinx.coroutines.CancellationException
@@ -15,12 +17,8 @@ import java.io.FileOutputStream
 /**
  * 修复 OPPO Reno5 Pro USB 共享网络 bug。
  *
- * 原理：GL.iNet OpenWrt 的 RNDIS 内核模块跟 OPPO Reno5 Pro 不兼容，
- * 手机插 USB 共享网络时识别不到。替换为修复版 kmod 后即可正常。
- *
- * 流程（2 步）：
- *  1. 从 app assets 提取内置 ipk → filesDir → SCP 上传到 /tmp/
- *  2. SSH 执行 opkg update + opkg install --force-reinstall /tmp/xxx.ipk
+ * GL.iNet OpenWrt 自带 RNDIS 内核模块与 OPPO Reno5 Pro 不兼容，
+ * 替换为内置的修复版 kmod 后即可正常识别 USB 网络。
  */
 object WorkerUsbTethering {
 
@@ -32,14 +30,15 @@ object WorkerUsbTethering {
         onLog: suspend (String) -> Unit,
     ): Result<Boolean> = withContext(Dispatchers.IO) worker@{
         try {
-            val port = fields.port.toIntOrNull() ?: 22
+            val f = fields.normalized()
+            val port = f.port.toIntOrNull() ?: 22
             ensureActiveOrCancel()
 
-            // ---- 步骤 1/2：提取 assets 内置 ipk → filesDir → SCP 上传 ----
-            onLog(" 步骤 1/2：加载修复 ipk ")
+            // ---- 1/2：提取内置 ipk 并上传 ----
+            onLog("步骤 1/2 · 准备修复模块")
             val localFile = File(filesDir, Constants.USB_TETHERING_IPK)
             if (!localFile.isFile) {
-                onLog("· 从内置 assets 提取 ${Constants.USB_TETHERING_IPK}")
+                onLog("· 从应用内置资源提取修复模块")
                 appContext.assets.open(Constants.USB_TETHERING_IPK).use { input ->
                     FileOutputStream(localFile).use { out ->
                         val buf = ByteArray(64 * 1024)
@@ -50,60 +49,60 @@ object WorkerUsbTethering {
                         }
                     }
                 }
-                onLog("✓ 已提取到 ${localFile.absolutePath}（${localFile.length()} bytes）")
-            } else {
-                onLog("✓ 本地已存在 ${Constants.USB_TETHERING_IPK}（${localFile.length()} bytes）")
             }
+            onLog("✓ 修复模块已就绪（${formatBytes(localFile.length())}）")
             ensureActiveOrCancel()
 
-            // SCP 上传
             val remotePath = "/tmp/${Constants.USB_TETHERING_IPK}"
-            onLog("· SCP 上传到 $remotePath")
-            val conn = ssh.connect(fields.user, fields.ip, port, fields.password)
+            val conn = ssh.connect(f.user, f.ip, port, f.password)
             if (conn.isFailure) {
-                onLog("✗ SSH 连接失败：${conn.exceptionOrNull()?.message ?: conn.exceptionOrNull()?.javaClass?.simpleName}")
+                onLog("✗ SSH 连接失败：${conn.exceptionOrNull()?.toUserMessage("请检查 IP、端口和 root 密码")}")
                 return@worker Result.success(false)
             }
+            onLog("· 上传修复模块到 /tmp")
             val scpResult = ssh.scpUpload(localFile.absolutePath, remotePath)
             if (scpResult.isFailure) {
-                onLog("✗ SCP 上传失败：${scpResult.exceptionOrNull()?.message ?: "未知错误"}")
+                onLog("✗ 上传失败：${scpResult.exceptionOrNull()?.toUserMessage("请检查路由器 /tmp 空间")}")
                 runCatching { ssh.disconnect() }
                 return@worker Result.success(false)
             }
-            onLog("✓ SCP 上传完成")
+            onLog("✓ 修复模块已上传")
             ensureActiveOrCancel()
 
-            // ---- 步骤 2/2：opkg update + opkg install --force-reinstall ----
-            onLog(" 步骤 2/2：安装修复模块 ")
-            val cmd = "opkg update && opkg install --force-reinstall $remotePath; echo ===VERIFY===; opkg list-installed | grep kmod-usb-net-rndis"
-            onLog("· $cmd")
-            // opkg update + install 在 GL.iNet 上经常需要 2-3 分钟（拉 Packages.gz 索引慢）
-            val (code, out) = ssh.execCommand(cmd, timeoutMs = 180_000L).getOrElse {
-                (-1 to (it.message.orEmpty()))
+            // ---- 2/2：安装并校验 ----
+            onLog("步骤 2/2 · 安装修复模块")
+            val cmd =
+                "opkg update && opkg install --force-reinstall $remotePath; echo ===VERIFY===; opkg list-installed | grep kmod-usb-net-rndis"
+            val (code, out) = ssh.execCommand(cmd, timeoutMs = 180_000L).getOrElse { e ->
+                onLog("✗ 安装命令执行失败：${e.toUserMessage("请稍后重试")}")
+                runCatching { ssh.disconnect() }
+                return@worker Result.success(false)
             }
             runCatching { ssh.disconnect() }
 
-            onLog("· exit=$code")
-            out.lineSequence().take(60).forEach { onLog("  $it") }
-
-            // 校验：VERIFY 后必须出现 kmod-usb-net-rndis 前缀 + exit==0
             val verIdx = out.indexOf("===VERIFY===")
-            val after = if (verIdx < 0) out else out.substring(verIdx)
-            val installed = after.containsCi("kmod-usb-net-rndis")
-            if (!installed || code != 0) {
-                onLog("✗ 安装失败（kmod-usb-net-rndis 未出现在 list-installed 或 exit=$code）")
-                out.lineSequence().take(80).forEach { onLog("  $it") }
+            if (verIdx < 0) {
+                onLog("✗ 未收到安装校验标记，无法确认修复模块是否安装成功")
+                out.lineSequence().filter { it.isNotBlank() }.take(40).forEach { onLog("  $it") }
                 return@worker Result.success(false)
             }
-            onLog("✓ kmod-usb-net-rndis 已安装，修复完成")
-            onLog(" 修复成功 ")
-            onLog("提示：重启路由器，OPPO Reno5 Pro USB 共享网络应恢复正常。")
+            val after = out.substring(verIdx)
+            val installed = after.containsCi("kmod-usb-net-rndis")
+            if (!installed || code != 0) {
+                onLog("✗ 修复模块安装失败（exit=$code）")
+                onLog("--- opkg 输出（前 60 行）---")
+                out.lineSequence().filter { it.isNotBlank() }.take(60).forEach { onLog("  $it") }
+                onLog("· 建议：确认路由器可以访问软件源后重试")
+                return@worker Result.success(false)
+            }
+            onLog("✓ 修复模块已安装")
+            onLog("· 请重启路由器，OPPO Reno5 Pro 的 USB 共享网络即可恢复")
             Result.success(true)
         } catch (ce: CancellationException) {
-            onLog("! 已强制结束 USB 共享网络修复")
-            Result.success(false)
+            onLog("! USB 共享网络修复已取消")
+            throw ce
         } catch (e: Throwable) {
-            onLog("✗ 修复异常：${e.message ?: e.javaClass.simpleName}")
+            onLog("✗ 修复异常：${e.toUserMessage("请稍后重试")}")
             Result.failure(e)
         } finally {
             runCatching { ssh.disconnect() }

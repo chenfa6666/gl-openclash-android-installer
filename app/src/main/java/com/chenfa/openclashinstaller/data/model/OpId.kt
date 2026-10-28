@@ -4,6 +4,7 @@ package com.chenfa.openclashinstaller.data.model
 enum class OpId {
     DL_KERNEL,      // 下载内核
     DL_OPENCLASH,   // 下载 openclash
+    DL_FAN,         // 下载风扇控制插件
     INSTALL,        // 4 步安装 OpenClash
     TESTCONN,       // 连接测试
     FAN,            // 风扇控制
