@@ -15,7 +15,7 @@ object Constants {
 
     // 本地文件名（存放在 app filesDir）
     const val KERNEL_FILE = "clash-linux-arm64.tar.gz"
-    const val OPENCLASH_IPK_DEFAULT = "luci-app-openclash_0.47.156_all.ipk"
+    const val OPENCLASH_IPK_DEFAULT = "luci-app-openclash_0.48.002_all.ipk"
     const val OPENCLASH_IPK_GLOB = "luci-app-openclash_*_all.ipk"
     const val FAN_IPK_FILE = "gl-fanctrl_0.1.3_all.ipk"
 

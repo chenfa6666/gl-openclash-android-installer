@@ -1,85 +1,120 @@
 package com.chenfa.openclashinstaller.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowInsetsControllerCompat
+import com.chenfa.openclashinstaller.data.model.ThemeMode
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.ThemeController
 
-private val LightColors = lightColorScheme(
-    primary = PrimaryLight,
-    onPrimary = Color.White,
-    secondary = PrimaryLight,
-    background = WallpaperLightMid,
-    onBackground = OnSurfaceLight,
-    surface = WallpaperLightMid,
-    onSurface = OnSurfaceLight,
-    surfaceVariant = SurfaceVariantLight,
-    onSurfaceVariant = OnSurfaceVariantLight,
-    outline = Color(0xFF5B6B86),
-    error = ErrorLight,
+/**
+ * 业务状态色。
+ *
+ * KernelSU 的绿色状态卡使用固定的深绿/浅绿组合，不跟随动态取色，
+ * 这样在纯黑背景上仍有稳定的辨识度。
+ */
+@Immutable
+data class AppStatusColors(
+    val success: Color,
+    val successContainer: Color,
+    val onSuccessContainer: Color,
+    val warning: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
 )
 
-private val DarkColors = darkColorScheme(
-    primary = PrimaryDark,
-    onPrimary = Color(0xFF061226),
-    secondary = PrimaryDark,
-    background = WallpaperDarkMid,
-    onBackground = OnSurfaceDark,
-    surface = WallpaperDarkMid,
-    onSurface = OnSurfaceDark,
-    surfaceVariant = SurfaceVariantDark,
-    onSurfaceVariant = OnSurfaceVariantDark,
-    outline = Color(0xFF8FA6CC),
-    error = ErrorDark,
-    onError = Color(0xFF2A060A),
+private val LightStatusColors = AppStatusColors(
+    success = Color(0xFF248A3D),
+    successContainer = Color(0xFFDFFAE4),
+    onSuccessContainer = Color(0xFF164A29),
+    warning = Color(0xFFB25000),
+    warningContainer = Color(0xFFFFF1D6),
+    onWarningContainer = Color(0xFF4A2C00),
 )
+
+private val DarkStatusColors = AppStatusColors(
+    success = Color(0xFF36D167),
+    successContainer = Color(0xFF1A3825),
+    onSuccessContainer = Color(0xFFDFFAE4),
+    warning = Color(0xFFFF9F0A),
+    warningContainer = Color(0xFF3A2A0A),
+    onWarningContainer = Color(0xFFFFE2A8),
+)
+
+private val LocalAppStatusColors = staticCompositionLocalOf { LightStatusColors }
+private val LocalAppIsDark = staticCompositionLocalOf { false }
+
+val AppStatus: AppStatusColors
+    @Composable @ReadOnlyComposable
+    get() = LocalAppStatusColors.current
+
+val appIsDarkTheme: Boolean
+    @Composable @ReadOnlyComposable
+    get() = LocalAppIsDark.current
 
 @Composable
+@ReadOnlyComposable
+fun isInDarkTheme(): Boolean = appIsDarkTheme
+
+/** 与 KernelSU 一致的外观开关，由 MainScreen 根据设置提供。 */
+val LocalEnableBlur = staticCompositionLocalOf { false }
+val LocalEnableFloatingBottomBar = staticCompositionLocalOf { false }
+val LocalEnableFloatingBottomBarBlur = staticCompositionLocalOf { false }
+
+/**
+ * 应用主题：按 KernelSU 的 Miuix 外观实现。
+ *
+ * - 跟随系统 / 浅色 / 深色三档
+ * - 可选 Monet 动态取色（关闭时使用 Miuix 默认蓝）
+ * - 深浅色下都使用纯黑/纯白背景 + 分组卡片
+ */
+@Composable
 fun OpenClashTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    monetEnabled: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) DarkColors else LightColors
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            // 液态壁纸全屏铺底，系统栏透明融入
-            window.statusBarColor = Color.Transparent.toArgb()
-            if (Build.VERSION.SDK_INT >= 27) {
-                window.navigationBarColor = Color.Transparent.toArgb()
-            }
-            val controller = WindowCompat.getInsetsController(window, view)
-            // 状态栏/导航栏图标色：亮色主题（亮壁纸）→ 黑；暗色主题（暗壁纸）→ 白
-            controller.isAppearanceLightStatusBars = !darkTheme
-            if (Build.VERSION.SDK_INT >= 26) {
-                controller.isAppearanceLightNavigationBars = !darkTheme
-            }
-            // 取消系统栏强制遮罩，做到真正的「壁纸与玻璃融为一体」
-            if (Build.VERSION.SDK_INT >= 29) {
-                window.isStatusBarContrastEnforced = false
-                window.isNavigationBarContrastEnforced = false
+    val context = LocalContext.current
+    val systemDark = isSystemInDarkTheme()
+    val dark = when (themeMode) {
+        ThemeMode.SYSTEM -> systemDark
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+
+    val controller = ThemeController(
+        colorSchemeMode = when (themeMode) {
+            ThemeMode.SYSTEM -> if (monetEnabled) ColorSchemeMode.MonetSystem else ColorSchemeMode.System
+            ThemeMode.LIGHT -> if (monetEnabled) ColorSchemeMode.MonetLight else ColorSchemeMode.Light
+            ThemeMode.DARK -> if (monetEnabled) ColorSchemeMode.MonetDark else ColorSchemeMode.Dark
+        },
+        isDark = dark,
+    )
+
+    MiuixTheme(controller = controller) {
+        val actualDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+        LaunchedEffect(actualDark, context) {
+            val window = (context as? Activity)?.window ?: return@LaunchedEffect
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !actualDark
+                isAppearanceLightNavigationBars = !actualDark
             }
         }
-    }
-    CompositionLocalProvider(
-        LocalDarkTheme provides darkTheme,
-        LocalGlassTokens provides if (darkTheme) DarkGlassTokens else LightGlassTokens,
-    ) {
-        MaterialTheme(
-            colorScheme = colors,
-            typography = Typography,
-            shapes = Shapes,
-            content = content,
-        )
+        CompositionLocalProvider(
+            LocalAppIsDark provides actualDark,
+            LocalAppStatusColors provides if (actualDark) DarkStatusColors else LightStatusColors,
+        ) {
+            content()
+        }
     }
 }

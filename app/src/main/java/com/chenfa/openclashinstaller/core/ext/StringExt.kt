@@ -27,3 +27,18 @@ fun formatBytes(bytes: Long): String {
     val n = v / 1024.0.pow(digit.toDouble())
     return "%.2f %s".format(n, units[digit])
 }
+
+/** 人类可读的耗时：860ms / 8.4 秒 / 2 分 13 秒。 */
+fun formatDuration(ms: Long): String {
+    val safe = ms.coerceAtLeast(0L)
+    return when {
+        safe < 1000L -> "${safe}ms"
+        safe < 60_000L -> "%.1f 秒".format(safe / 1000.0)
+        else -> {
+            val totalSeconds = safe / 1000L
+            val minutes = totalSeconds / 60L
+            val seconds = totalSeconds % 60L
+            if (seconds == 0L) "${minutes} 分" else "${minutes} 分 ${seconds} 秒"
+        }
+    }
+}

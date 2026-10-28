@@ -2,7 +2,14 @@
 /build/
 /app/build/
 /.gradle/
+/.gradle-home/
+/.kotlin/
 /local.properties
+/.android-sdk/
+/.android-home/
+/.scratch/
+/.tools/
+/dist/
 
 # IDE
 /.idea/

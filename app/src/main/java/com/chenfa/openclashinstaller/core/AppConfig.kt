@@ -14,14 +14,20 @@ class AppConfig(private val filesDir: File) {
     val localIpk: File get() = File(filesDir, Constants.OPENCLASH_IPK_DEFAULT)
     val localFan: File get() = File(filesDir, Constants.FAN_IPK_FILE)
 
-    /** 通配查找 luci-app-openclash_*_all.ipk（用户可能下了不同版本号）；等价 Windows FindLocalIpk。 */
-    fun findLocalIpk(): File? = findFileByGlob(Constants.OPENCLASH_IPK_GLOB)
+    /**
+     * 通配查找 luci-app-openclash_*_all.ipk（用户可能下了不同版本号）。
+     * 多个版本共存时取最近修改的一个，避免安装到旧包。
+     */
+    fun findLocalIpk(): File? = localIpk.takeIf { it.isFile }
+        ?: findFilesByGlob(Constants.OPENCLASH_IPK_GLOB).maxByOrNull { it.lastModified() }
 
     /** 通用 glob 查找：* 任意字符，按文件名匹配。当找不到时返回 null。 */
-    fun findFileByGlob(glob: String): File? {
-        if (!filesDir.isDirectory) return null
-        // 正确：按 '*' 分段，每段单独 Regex.escape，再用 ".*" 拼接，避免 Regex.escape(整个串) 把
-        // '*' 塞在 \Q...\E 字面量里导致后续字符串替换找不到 \* 而通配失效。
+    fun findFileByGlob(glob: String): File? = findFilesByGlob(glob).firstOrNull()
+
+    /** 通用 glob 查找，返回全部匹配文件。 */
+    fun findFilesByGlob(glob: String): List<File> {
+        if (!filesDir.isDirectory) return emptyList()
+        // 按 '*' 分段，每段单独 Regex.escape，再用 ".*" 拼接，避免把通配符转义成字面量。
         val segments = glob.split('*')
         val regexStr = buildString {
             append('^')
@@ -32,7 +38,9 @@ class AppConfig(private val filesDir: File) {
             append('$')
         }
         val re = Regex(regexStr)
-        return filesDir.listFiles()?.firstOrNull { it.isFile && re.matches(it.name) }
+        return filesDir.listFiles()
+            ?.filter { it.isFile && re.matches(it.name) }
+            .orEmpty()
     }
 
     /** 精确文件名是否存在。 */

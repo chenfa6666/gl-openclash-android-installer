@@ -154,8 +154,9 @@ class SshClient(
 
     /** 关闭会话。 */
     fun disconnect() {
-        session?.disconnect()
+        val current = session
         session = null
+        runCatching { current?.disconnect() }
     }
 
     /** 取消钩子：等价 Windows 版 TerminateProcess(pid)。 */
